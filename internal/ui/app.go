@@ -231,15 +231,6 @@ func containsStr(s, sub string) bool {
 	return false
 }
 
-func indexOfScreen(s Screen) int {
-	for i, x := range SidebarOrder {
-		if x == s {
-			return i
-		}
-	}
-	return 0
-}
-
 func (a *App) setFlash(f FlashMsg) tea.Cmd {
 	a.flashID++
 	id := a.flashID

@@ -40,7 +40,6 @@ type Notes struct {
 	view      []api.NoteSummary
 	current   api.Note
 	folderID  string // empty = all
-	folderCur int    // cursor in folder management overlay
 	tbl       table.Model
 	folderTbl table.Model
 

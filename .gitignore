@@ -32,6 +32,6 @@ go.work.sum
 # .vscode/
 
 # Build outputs
-bin/
-dist/
-memoire
+/bin/
+/dist/
+/memoire

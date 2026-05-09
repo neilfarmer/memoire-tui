@@ -26,7 +26,6 @@ type Assistant struct {
 	width  int
 	height int
 
-	loading     bool
 	err         error
 	convos      []api.Conversation
 	messages    []api.ChatMessage
@@ -175,7 +174,7 @@ func (a *Assistant) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (a *Assistant) refreshView() {
 	rows := []string{}
 	for _, m := range a.messages {
-		role := strings.Title(m.Role)
+		role := titleCase(m.Role)
 		head := lipgloss.NewStyle().Foreground(styles.Primary).Bold(true).Render(role)
 		body := components.RenderMarkdown(m.Content, a.view.Width-2)
 		rows = append(rows, head, body, "")
@@ -218,6 +217,19 @@ func (a *Assistant) newConversation() tea.Cmd {
 	a.currentConv = ""
 	a.refreshView()
 	return nil
+}
+
+// titleCase uppercases the first rune of an ASCII word; replaces deprecated
+// strings.Title for the assistant role labels.
+func titleCase(s string) string {
+	if s == "" {
+		return ""
+	}
+	r := []rune(s)
+	if r[0] >= 'a' && r[0] <= 'z' {
+		r[0] -= 32
+	}
+	return string(r)
 }
 
 func (a *Assistant) View() string {

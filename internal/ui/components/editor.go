@@ -40,7 +40,7 @@ func EditExternal(initial, ext string) tea.Cmd {
 
 	parts := strings.Fields(editor)
 	args := append(parts[1:], path)
-	cmd := exec.Command(parts[0], args...)
+	cmd := exec.Command(parts[0], args...) //#nosec G204,G702 -- $EDITOR is user config; intentional shell-out
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -50,7 +50,7 @@ func EditExternal(initial, ext string) tea.Cmd {
 		if execErr != nil {
 			return EditorClosedMsg{Err: fmt.Errorf("%s: %w", editor, execErr)}
 		}
-		buf, err := os.ReadFile(path)
+		buf, err := os.ReadFile(path) //#nosec G304 -- path is the tmpfile we just created above
 		if err != nil {
 			return EditorClosedMsg{Err: err}
 		}

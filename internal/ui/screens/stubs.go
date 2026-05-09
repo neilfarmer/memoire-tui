@@ -6,8 +6,6 @@ package screens
 
 import "github.com/neilfarmer/memoire-tui/internal/api"
 
-func newStub(name string) Screen { return NewPlaceholder(name) }
-
 func NewDashboard(c *api.Client) Screen { return newDashboard(c) }
 func NewTasks(c *api.Client) Screen     { return newTasks(c) }
 func NewNotes(c *api.Client) Screen     { return newNotes(c) }

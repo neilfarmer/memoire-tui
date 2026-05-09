@@ -27,9 +27,8 @@ type Nutrition struct {
 	width  int
 	height int
 
-	mode    nutritionMode
-	loading bool
-	err     error
+	mode nutritionMode
+	err  error
 
 	cursor  time.Time
 	current api.NutritionLog
@@ -45,7 +44,6 @@ type mealFormState struct {
 	protein  string
 	carbs    string
 	fat      string
-	notes    string
 }
 
 type nutritionLogMsg struct {

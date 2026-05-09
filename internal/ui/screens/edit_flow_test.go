@@ -153,15 +153,6 @@ func (fb *fakeBackend) saw(method, path string) bool {
 	return false
 }
 
-func (fb *fakeBackend) lastBody() string {
-	fb.mu.Lock()
-	defer fb.mu.Unlock()
-	if len(fb.bodies) == 0 {
-		return ""
-	}
-	return fb.bodies[len(fb.bodies)-1]
-}
-
 func (fb *fakeBackend) bodyContains(s string) bool {
 	fb.mu.Lock()
 	defer fb.mu.Unlock()

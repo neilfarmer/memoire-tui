@@ -27,7 +27,7 @@ func Init() error {
 	if dest == "" {
 		dest = "/tmp/memoire-tui.log"
 	}
-	f, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	f, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600) //#nosec G304,G703 -- log path is intentionally user-controlled via MEMOIRE_LOG
 	if err != nil {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 		return err

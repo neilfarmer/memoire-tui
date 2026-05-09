@@ -53,7 +53,7 @@ func Load(override string) (Config, string, error) {
 		return Config{}, "", err
 	}
 	cfg := Config{}
-	if data, err := os.ReadFile(path); err == nil {
+	if data, err := os.ReadFile(path); err == nil { //#nosec G304 -- path is the user's own config file (env or default ~/.config)
 		if _, err := toml.Decode(string(data), &cfg); err != nil {
 			return cfg, path, fmt.Errorf("parse %s: %w", path, err)
 		}
@@ -76,7 +76,7 @@ func Save(cfg Config, path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600) //#nosec G304 -- path is the user's own config file
 	if err != nil {
 		return err
 	}

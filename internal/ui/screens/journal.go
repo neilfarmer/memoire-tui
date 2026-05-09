@@ -27,9 +27,8 @@ type Journal struct {
 	width  int
 	height int
 
-	mode    journalMode
-	loading bool
-	err     error
+	mode journalMode
+	err  error
 
 	cursor   time.Time
 	entries  map[string]bool

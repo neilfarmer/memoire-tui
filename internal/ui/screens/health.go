@@ -28,9 +28,8 @@ type Health struct {
 	width  int
 	height int
 
-	mode    healthMode
-	loading bool
-	err     error
+	mode healthMode
+	err  error
 
 	cursor  time.Time
 	current api.HealthLog
