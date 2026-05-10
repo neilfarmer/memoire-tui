@@ -301,3 +301,8 @@ func (a *Assistant) Help() []components.HelpEntry {
 	}
 }
 func (a *Assistant) SetSize(w, h int) { a.width, a.height = w, h }
+
+// IsTextEditing reports that the input textarea owns focus, so the App
+// should not steal single-character shortcuts (e.g. "?") that the user is
+// trying to type into the chat input.
+func (a *Assistant) IsTextEditing() bool { return a.pane == assistantPaneInput }

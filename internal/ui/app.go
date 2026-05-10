@@ -132,6 +132,12 @@ func (a *App) handleKey(m tea.KeyMsg) (tea.Cmd, bool) {
 	case key.Matches(m, a.keys.Quit):
 		return tea.Quit, true
 	case m.String() == "?":
+		// Skip the global help toggle when the active screen reports a
+		// text-input is focused. Otherwise the user cannot type "?" inside
+		// the assistant chat, note title, etc.
+		if a.currentScreenIsEditing() {
+			return nil, false
+		}
 		a.helpOpen = !a.helpOpen
 		return nil, true
 	}
@@ -197,6 +203,27 @@ func (a *App) handleKey(m tea.KeyMsg) (tea.Cmd, bool) {
 		return nil, true
 	}
 	return nil, false
+}
+
+// textEditing is implemented by screens that have a focused text input
+// (textarea, huh form input). When true, app-level single-character
+// shortcuts must defer to the screen so the user can type literal chars
+// like "?" or "n" into the input.
+type textEditing interface {
+	IsTextEditing() bool
+}
+
+// currentScreenIsEditing reports whether the active screen claims a text
+// input is focused.
+func (a *App) currentScreenIsEditing() bool {
+	cur, ok := a.registry[a.current]
+	if !ok {
+		return false
+	}
+	if te, ok := cur.(textEditing); ok {
+		return te.IsTextEditing()
+	}
+	return false
 }
 
 // isTerminalNoiseKey reports whether a tea KeyMsg.String() looks like a

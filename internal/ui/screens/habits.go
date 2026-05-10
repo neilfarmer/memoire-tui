@@ -320,3 +320,6 @@ func (h *Habits) Help() []components.HelpEntry {
 	}
 }
 func (h *Habits) SetSize(w, ht int) { h.width, h.height = w, ht }
+
+// IsTextEditing reports that a form is active.
+func (h *Habits) IsTextEditing() bool { return h.mode == habitForm }
