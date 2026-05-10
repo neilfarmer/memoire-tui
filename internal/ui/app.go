@@ -158,8 +158,11 @@ func (a *App) handleKey(m tea.KeyMsg) (tea.Cmd, bool) {
 	if key.Matches(m, a.keys.Quit) {
 		return tea.Quit, true
 	}
-	// Sidebar focus: arrows nav screens, enter drills into content.
-	if a.sideFocus && !a.currentScreenIsEditing() {
+	// Sidebar focus: arrows nav screens, enter drills into content. The
+	// sidebar always wins arrow + enter when focused, even if the active
+	// screen has a textarea (e.g. Assistant) — the textarea isn't really
+	// receiving input until the user drills in.
+	if a.sideFocus {
 		switch m.String() {
 		case "up":
 			if a.sideCursor > 0 {
@@ -176,17 +179,18 @@ func (a *App) handleKey(m tea.KeyMsg) (tea.Cmd, bool) {
 			return nil, true
 		}
 	}
-	// `?` toggles help unless a text input is focused.
+	// `?` toggles help unless content is focused with a real text input.
 	if m.String() == "?" {
-		if a.currentScreenIsEditing() {
+		if !a.sideFocus && a.currentScreenIsEditing() {
 			return nil, false
 		}
 		a.helpOpen = !a.helpOpen
 		return nil, true
 	}
-	// `:` opens the command palette unless a text input is focused.
+	// `:` opens the command palette unless content is focused with a real
+	// text input.
 	if m.String() == ":" {
-		if a.currentScreenIsEditing() {
+		if !a.sideFocus && a.currentScreenIsEditing() {
 			return nil, false
 		}
 		a.palette = components.NewCommandPalette(a.commandList())
@@ -194,28 +198,27 @@ func (a *App) handleKey(m tea.KeyMsg) (tea.Cmd, bool) {
 		return nil, true
 	}
 	// Esc drill-up:
-	//   form / detail → list (screen.OnEscape)
-	//   list (content focused) → sidebar focus
-	//   sidebar focused → quit confirm
+	//   sidebar focused → quit confirm (regardless of which screen is shown)
+	//   content focused, screen sub-mode → screen.OnEscape pops one level
+	//   content focused, top level → return focus to sidebar
 	if m.String() == "esc" {
-		if a.currentScreenIsEditing() {
-			// Forms / chat input handle esc themselves.
-			return nil, false
-		}
-		if !a.sideFocus {
-			if cur, ok := a.registry[a.current]; ok {
-				if e, ok := cur.(escapableScreen); ok {
-					if e.OnEscape() {
-						return nil, true
-					}
-				}
-			}
-			// Content is at its top level — return focus to sidebar.
-			a.sideFocus = true
+		if a.sideFocus {
+			a.quitConfirm = true
 			return nil, true
 		}
-		// Already on sidebar — confirm quit.
-		a.quitConfirm = true
+		// Content focused. Forms / chat textareas handle their own esc.
+		if a.currentScreenIsEditing() {
+			return nil, false
+		}
+		if cur, ok := a.registry[a.current]; ok {
+			if e, ok := cur.(escapableScreen); ok {
+				if e.OnEscape() {
+					return nil, true
+				}
+			}
+		}
+		// Content is at its top level — return focus to sidebar.
+		a.sideFocus = true
 		return nil, true
 	}
 	return nil, false

@@ -124,9 +124,12 @@ func TestEndToEnd_QuestionMarkInAssistantDoesNotOpenHelp(t *testing.T) {
 	client := api.New(srv.URL, "pat_test")
 	app := New(client, DefaultFactories(client))
 
-	// Pre-activate the assistant screen so its IsTextEditing reports true.
+	// Pre-activate the assistant screen + drill into content so the textarea
+	// is the focused widget. While sidebar is focused, '?' should still
+	// open help — it only defers when the user is actually typing.
 	app.sideCursor = 0
 	app.activate(ScreenAssistant)
+	app.sideFocus = false
 	app.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	// Send '?' directly to the App. With the fix, the global handler must
