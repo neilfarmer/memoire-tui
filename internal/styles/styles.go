@@ -60,30 +60,13 @@ var (
 	ChipDanger  = lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.AdaptiveColor{Light: "#ffffff", Dark: "#0b0f14"}).Background(Danger).Bold(true)
 )
 
-// Boxes — switched to ThickBorder for stronger separation.
+// Boxes.
 var (
-	Box        = lipgloss.NewStyle().Border(BorderThick).BorderForeground(Border).Padding(0, 1)
-	BoxFocused = lipgloss.NewStyle().Border(BorderThick).BorderForeground(Primary).Padding(0, 1)
-	Panel1     = lipgloss.NewStyle().Border(BorderDouble).BorderForeground(Border).Padding(0, 1)
-	PanelFocus = lipgloss.NewStyle().Border(BorderDouble).BorderForeground(Primary).Padding(0, 1)
-	OuterFrame = lipgloss.NewStyle().Border(BorderRounded).BorderForeground(Primary)
+	Box        = lipgloss.NewStyle().Border(BorderRounded).BorderForeground(Border).Padding(0, 1)
+	BoxFocused = lipgloss.NewStyle().Border(BorderRounded).BorderForeground(Primary).Padding(0, 1)
+	Panel1     = lipgloss.NewStyle().Border(BorderThick).BorderForeground(Border).Padding(0, 1)
+	PanelFocus = lipgloss.NewStyle().Border(BorderThick).BorderForeground(Primary).Padding(0, 1)
 )
-
-// Row striping for table cells. Alternating subtle backgrounds make
-// individual rows easier to track in dense tables.
-var (
-	RowStripeEven = lipgloss.NewStyle().Background(lipgloss.AdaptiveColor{Light: "#f1f5f9", Dark: "#0e1620"})
-	RowStripeOdd  = lipgloss.NewStyle().Background(lipgloss.AdaptiveColor{Light: "#e2e8f0", Dark: "#152030"})
-)
-
-// StripeCell wraps a cell value with the row's stripe background.
-func StripeCell(value string, rowIndex int) string {
-	style := RowStripeEven
-	if rowIndex%2 == 1 {
-		style = RowStripeOdd
-	}
-	return style.Render(value)
-}
 
 // KeyHint formats `<key> desc` k9s-style.
 func KeyHint(key, desc string) string {
