@@ -16,8 +16,16 @@ type Column = table.Column
 type Row = table.Row
 
 // NewTable returns a styled table.Model. Column header row in cyan, primary-
-// coloured selection. Row striping is handled separately by Stripe() — call
-// it on your rows before SetRows.
+// coloured selection.
+//
+// bubbles/table v1.0.0 truncates each cell with runewidth.Truncate AFTER
+// applying the cell style, which means embedding ANSI background codes in
+// cell values gets miscounted and corrupts the render. We can't do per-row
+// striping at the cell level without forking the upstream package, so we
+// rely on a strong selection style + the column-header bottom border for
+// row separation. WithStripeColumn / Stripe / Stripe-with-cols below are
+// kept as no-ops so existing call sites keep compiling while we figure
+// out a custom striped table.
 func NewTable(cols []Column, rows []Row, height int) table.Model {
 	t := table.New(
 		table.WithColumns(cols),
@@ -36,45 +44,17 @@ func NewTable(cols []Column, rows []Row, height int) table.Model {
 		Foreground(lipgloss.AdaptiveColor{Light: "#ffffff", Dark: "#0b0f14"}).
 		Background(styles.Primary).
 		Bold(true)
-	// Drop default Padding(0,1) — Stripe() pads each cell itself so the
-	// background color reaches the column edge.
-	s.Cell = lipgloss.NewStyle().Foreground(styles.Text)
+	s.Cell = s.Cell.Foreground(styles.Text)
 	t.SetStyles(s)
 	return t
 }
 
-// WithStripeColumn is a no-op kept for backwards compatibility with screens
-// that still wrap their column lists. Stripe() draws full-row backgrounds
-// now, so a dedicated stripe column is unnecessary.
+// WithStripeColumn is now a no-op (see NewTable for why).
 func WithStripeColumn(cols []Column) []Column { return cols }
 
-var stripeBgs = []lipgloss.AdaptiveColor{
-	{Light: "#f8fafc", Dark: "#0e1620"},
-	{Light: "#e2e8f0", Dark: "#1a2332"},
-}
-
-// Stripe pads each cell to its column width and applies an alternating row
-// background so individual rows are visually distinct.
-func Stripe(rows []Row, cols []Column) []Row {
-	out := make([]Row, 0, len(rows))
-	for i, r := range rows {
-		bg := stripeBgs[i%len(stripeBgs)]
-		styled := make(Row, 0, len(r))
-		for ci, val := range r {
-			width := 0
-			if ci < len(cols) {
-				width = cols[ci].Width
-			}
-			cellStyle := lipgloss.NewStyle().Background(bg).Padding(0, 1)
-			if width > 0 {
-				cellStyle = cellStyle.Width(width).MaxWidth(width)
-			}
-			styled = append(styled, cellStyle.Render(val))
-		}
-		out = append(out, styled)
-	}
-	return out
-}
+// Stripe is a no-op pass-through. It accepts the variadic column slice for
+// backward compat with screens that already pass it.
+func Stripe(rows []Row, _ ...[]Column) []Row { return rows }
 
 // FrameTable renders a table k9s-style: bold title with count badge, the
 // table itself (no surrounding box — the table column header acts as the
