@@ -190,7 +190,7 @@ func (t *Tokens) startNew() tea.Cmd {
 	t.formName = ""
 	t.form = huh.NewForm(huh.NewGroup(
 		huh.NewInput().Title("Token name").Value(&t.formName).Validate(notEmpty),
-	))
+	)).WithKeyMap(components.FormKeyMap())
 	t.mode = tokenForm
 	return t.form.Init()
 }

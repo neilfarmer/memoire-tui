@@ -186,7 +186,7 @@ func (h *Health) startEdit() tea.Cmd {
 		huh.NewInput().Title("Calories burned").Value(&d.caloriesOut),
 		huh.NewInput().Title("Weight").Value(&d.weight),
 		huh.NewText().Title("Notes").Value(&d.notes).Lines(3),
-	))
+	)).WithKeyMap(components.FormKeyMap())
 	h.mode = healthForm
 	return h.form.Init()
 }

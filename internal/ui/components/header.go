@@ -90,7 +90,7 @@ func Crumbs(parts ...string) string {
 
 // FormHint renders the standard "tab/ctrl+s/esc" hint shown beneath a huh form.
 func FormHint() string {
-	return MutedHint("<tab> next field  <shift+tab> prev  <ctrl+s> save  <esc> cancel")
+	return MutedHint("<tab> next field  <shift+tab> prev  <enter> newline  <ctrl+e> $EDITOR  <ctrl+s> save  <esc> cancel")
 }
 
 // MutedHint wraps a string in muted color.

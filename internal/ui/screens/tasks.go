@@ -357,7 +357,7 @@ func (t *Tasks) newForm(title string) *huh.Form {
 			huh.NewInput().Title("Scheduled start (RFC3339, optional)").Value(&d.scheduled),
 			huh.NewInput().Title("Duration minutes (optional)").Value(&d.duration),
 		),
-	).WithTheme(huh.ThemeBase())
+	).WithTheme(huh.ThemeBase()).WithKeyMap(components.FormKeyMap())
 }
 
 func validateOptionalDate(s string) error {

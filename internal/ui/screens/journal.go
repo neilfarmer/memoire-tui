@@ -216,7 +216,7 @@ func (j *Journal) startEdit() tea.Cmd {
 		).Value(&d.mood),
 		huh.NewText().Title("Body (markdown — ctrl+e for $EDITOR)").Value(&d.body).Lines(10),
 		huh.NewInput().Title("Tags (comma separated)").Value(&d.tags),
-	))
+	)).WithKeyMap(components.FormKeyMap())
 	j.mode = journalForm
 	return j.form.Init()
 }

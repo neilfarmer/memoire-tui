@@ -364,7 +364,7 @@ func (f *Finances) newForm() *huh.Form {
 			huh.NewInput().Title("APR (%)").Value(&d.apr),
 			huh.NewInput().Title("Monthly payment").Value(&d.monthlyPay),
 			huh.NewText().Title("Notes").Value(&d.notes).Lines(2),
-		))
+		)).WithKeyMap(components.FormKeyMap())
 	case tabIncome:
 		return huh.NewForm(huh.NewGroup(
 			huh.NewInput().Title("Source").Value(&d.name).Validate(notEmpty),
@@ -376,7 +376,7 @@ func (f *Finances) newForm() *huh.Form {
 				huh.NewOption("Annual", "annual"),
 			).Value(&d.frequency),
 			huh.NewText().Title("Notes").Value(&d.notes).Lines(2),
-		))
+		)).WithKeyMap(components.FormKeyMap())
 	case tabExpenses:
 		return huh.NewForm(huh.NewGroup(
 			huh.NewInput().Title("Name").Value(&d.name).Validate(notEmpty),
@@ -399,9 +399,9 @@ func (f *Finances) newForm() *huh.Form {
 			).Value(&d.frequency),
 			huh.NewInput().Title("Due day").Value(&d.dueDay),
 			huh.NewText().Title("Notes").Value(&d.notes).Lines(2),
-		))
+		)).WithKeyMap(components.FormKeyMap())
 	}
-	return huh.NewForm()
+	return huh.NewForm().WithKeyMap(components.FormKeyMap())
 }
 
 func notEmpty(s string) error {

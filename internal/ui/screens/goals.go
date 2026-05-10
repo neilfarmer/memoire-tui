@@ -262,7 +262,7 @@ func (g *Goals) newForm() *huh.Form {
 		).Value(&d.status),
 		huh.NewInput().Title("Deadline (YYYY-MM-DD)").Value(&d.deadline).Validate(validateOptionalDate),
 		huh.NewInput().Title("Progress (0-100)").Value(&d.progress),
-	))
+	)).WithKeyMap(components.FormKeyMap())
 }
 
 func (g *Goals) submit() tea.Cmd {

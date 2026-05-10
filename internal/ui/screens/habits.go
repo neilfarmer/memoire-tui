@@ -209,7 +209,7 @@ func (h *Habits) newForm(title string) *huh.Form {
 			huh.NewOption("Evening", "evening"),
 		).Value(&d.timeOfDay),
 		huh.NewInput().Title("Notify time (HH:MM UTC, optional)").Value(&d.notifyTime),
-	))
+	)).WithKeyMap(components.FormKeyMap())
 }
 
 func (h *Habits) submit() tea.Cmd {

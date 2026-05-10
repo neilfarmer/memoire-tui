@@ -242,7 +242,7 @@ func (b *Bookmarks) newForm() *huh.Form {
 		huh.NewInput().Title("Title").Value(&d.title),
 		huh.NewInput().Title("Tags (comma separated)").Value(&d.tags),
 		huh.NewText().Title("Note").Value(&d.note).Lines(3),
-	))
+	)).WithKeyMap(components.FormKeyMap())
 }
 
 func (b *Bookmarks) submit() tea.Cmd {

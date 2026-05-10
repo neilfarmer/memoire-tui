@@ -253,7 +253,7 @@ func (f *Feeds) startAdd() tea.Cmd {
 	f.addURL = ""
 	f.addForm = huh.NewForm(huh.NewGroup(
 		huh.NewInput().Title("Feed URL").Value(&f.addURL).Validate(notEmpty),
-	))
+	)).WithKeyMap(components.FormKeyMap())
 	f.mode = feedsAddForm
 	return f.addForm.Init()
 }

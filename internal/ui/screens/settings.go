@@ -166,7 +166,7 @@ func (s *Settings) startEdit() tea.Cmd {
 			huh.NewInput().Title("Autosave seconds").Value(&d.autosaveSeconds),
 			huh.NewInput().Title("Profile inference hours").Value(&d.profileInferenceHours),
 		),
-	)
+	).WithKeyMap(components.FormKeyMap())
 	s.mode = settingsEdit
 	return s.form.Init()
 }

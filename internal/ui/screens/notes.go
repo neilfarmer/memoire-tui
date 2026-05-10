@@ -446,7 +446,7 @@ func (n *Notes) newForm(title string) *huh.Form {
 			huh.NewText().Title("Body (markdown — ctrl+e for $EDITOR)").Value(&d.body).Lines(8),
 			huh.NewInput().Title("Tags (comma separated)").Value(&d.tags),
 		),
-	).WithTheme(huh.ThemeBase())
+	).WithTheme(huh.ThemeBase()).WithKeyMap(components.FormKeyMap())
 }
 
 func (n *Notes) submitForm() tea.Cmd {
@@ -482,7 +482,7 @@ func (n *Notes) startFolderForm() tea.Cmd {
 	n.folderFormName = ""
 	n.folderForm = huh.NewForm(huh.NewGroup(
 		huh.NewInput().Title("Folder name").Value(&n.folderFormName).Validate(notEmpty),
-	))
+	)).WithKeyMap(components.FormKeyMap())
 	n.mode = noteFolderForm
 	return n.folderForm.Init()
 }
