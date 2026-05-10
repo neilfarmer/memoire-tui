@@ -3,7 +3,6 @@ package screens
 import (
 	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -41,8 +40,8 @@ type Feeds struct {
 
 	feeds       []api.Feed
 	articles    []api.Article
-	feedsTbl    table.Model
-	articlesTbl table.Model
+	feedsTbl    components.Model
+	articlesTbl components.Model
 
 	currentArticle api.Article
 	articleText    string

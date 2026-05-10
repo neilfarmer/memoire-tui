@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -45,9 +44,9 @@ type Finances struct {
 	expenses []api.FixedExpense
 	summary  api.FinancesSummary
 
-	debtsTbl    table.Model
-	incomesTbl  table.Model
-	expensesTbl table.Model
+	debtsTbl    components.Model
+	incomesTbl  components.Model
+	expensesTbl components.Model
 
 	form   *huh.Form
 	formIn financeFormState

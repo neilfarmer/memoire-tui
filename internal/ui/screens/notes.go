@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -40,8 +39,8 @@ type Notes struct {
 	view      []api.NoteSummary
 	current   api.Note
 	folderID  string // empty = all
-	tbl       table.Model
-	folderTbl table.Model
+	tbl       components.Model
+	folderTbl components.Model
 
 	form           *huh.Form
 	formData       noteFormState

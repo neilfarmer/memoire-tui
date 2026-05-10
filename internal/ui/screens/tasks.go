@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -39,7 +38,7 @@ type Tasks struct {
 	filtered []api.Task
 	filter   string
 	sortMode string
-	tbl      table.Model
+	tbl      components.Model
 
 	form     *huh.Form
 	formData taskFormState

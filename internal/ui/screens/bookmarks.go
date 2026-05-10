@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -33,7 +32,7 @@ type Bookmarks struct {
 	err     error
 
 	items  []api.Bookmark
-	tbl    table.Model
+	tbl    components.Model
 	tag    string
 	form   *huh.Form
 	formIn bookmarkFormState

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -34,7 +33,7 @@ type Tokens struct {
 
 	patForbidden bool
 	tokens       []api.Token
-	tbl          table.Model
+	tbl          components.Model
 
 	form          *huh.Form
 	formName      string

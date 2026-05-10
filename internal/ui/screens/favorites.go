@@ -3,7 +3,6 @@ package screens
 import (
 	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -20,7 +19,7 @@ type Favorites struct {
 	loading bool
 	err     error
 	items   []api.Favorite
-	tbl     table.Model
+	tbl     components.Model
 	confirm bool
 }
 

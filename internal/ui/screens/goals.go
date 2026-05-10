@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -34,7 +33,7 @@ type Goals struct {
 	goals   []api.Goal
 	view    []api.Goal
 	filter  string
-	tbl     table.Model
+	tbl     components.Model
 	form    *huh.Form
 	formIn  goalFormState
 }
