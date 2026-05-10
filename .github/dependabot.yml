@@ -1,0 +1,46 @@
+version: 2
+
+updates:
+  # Go module dependencies. Weekly cadence + grouping keeps PR noise low.
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+      - go
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+    groups:
+      # Bundle Charm Bracelet TUI libraries together — they tend to bump
+      # in lockstep and are best reviewed as one diff.
+      charm-tui:
+        patterns:
+          - "github.com/charmbracelet/*"
+      golang-x:
+        patterns:
+          - "golang.org/x/*"
+
+  # GitHub Actions workflow dependencies (uses: actions/...@vN).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+      timezone: "America/New_York"
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: "chore(actions)"
+      include: scope
+    groups:
+      github-actions:
+        patterns:
+          - "*"
