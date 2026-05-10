@@ -1,131 +1,186 @@
 # Memoire TUI — UX
 
-This file documents the layout, key bindings, and interaction patterns. The
-binary's `?` overlay regenerates the screen-specific section of this doc at
-runtime.
+Layout, key bindings, interaction patterns. Per-screen quick reference also
+appears in the `?` overlay at runtime.
 
 ## Window layout
 
 ```
-+----------------------------------------------------------+
-| memoire                          ● online  api.host      |  header
-+----------+-----------------------------------------------+
-|          |                                               |
-| Sidebar  |  current screen                               |
-|          |                                               |
-+----------+-----------------------------------------------+
-| Tasks   <flash msg>                          ? help q quit|  status bar
-+----------------------------------------------------------+
++------------------------------------------------------------+
+| ◆ memoire │ <Section>                  auth PAT  api.host  ● online
+| ────────────────────────────────────────────────────────────
+| ╭────────╮  <screen content>
+| │ Sidebar│
+| │  list  │
+| │        │
+| ╰────────╯
+| ────────────────────────────────────────────────────────────
+| Section   ↑↓ screens   ↵ enter screen   :  command   ?  help
++------------------------------------------------------------+
 ```
 
-- Sidebar lists every screen with a numeric prefix (1..9).
-- Header shows app name, current section, and reachability indicator.
-- Status bar shows screen, transient flash messages (4s TTL), and per-screen
-  key hints.
-- `?` overlays a centred dialog with global + current-screen key bindings.
+- **Header** — app name, active section, host + auth chips, online dot.
+- **Sidebar** — all screens with their icons. Currently focused screen is
+  highlighted; preview-activates as you arrow up/down.
+- **Status bar** — flash messages (4s TTL) on the left, screen + global
+  key hints on the right. The hints adapt to whether sidebar or content
+  is focused.
+- **Overlays** — help (`?`), command palette (`:`), confirm (delete /
+  quit), one-shot dialogs (token secret).
+
+## Focus model
+
+Implicit. No explicit toggle key.
+
+```
+sidebar focused (boot)
+   │
+   │  ↵ / →     drill into content
+   ▼
+content focused: list / table
+   │
+   │  ↵         drill into detail
+   ▼
+content focused: detail
+   │
+   │  e         drill into edit form (or n for new)
+   ▼
+content focused: form (text-input)
+```
+
+`esc` walks back up the same path. From the sidebar, `esc` opens the quit
+confirm. While the sidebar is focused, all global keys (arrows, esc, `?`,
+`:`) belong to the App regardless of which screen is shown — the textarea
+in (e.g.) Assistant only gets keys after the user has drilled into it.
 
 ## Global keys
 
 | Key | Action |
 |-----|--------|
+| `↑/↓` | move cursor (sidebar when focused, table rows when content is focused) |
+| `↵` | drill in (sidebar → content → detail → form) |
+| `esc` | back one level (drill up → sidebar → quit confirm) |
+| `:` | open command palette |
 | `?` | toggle help overlay |
-| `ctrl+q` | quit |
-| `1`–`9` | jump to first 9 sidebar entries |
-| `g <letter>` | leader nav: `g d` dashboard, `g t` tasks, `g n` notes, `g j` journal, `g h` habits, `g o` goals, `g H` health, `g u` nutrition, `g f` finances, `g r` feeds, `g b` bookmarks, `g v` favorites, `g a` assistant, `g s` settings, `g k` tokens, `g x` admin |
 | `ctrl+r` | refresh current screen |
+| `ctrl+q` | force quit (no confirm) |
 
-## Screen patterns
+## Universal per-screen keys
 
-Every CRUD screen follows the same three-state Bubble Tea machine:
-
-- **list** — `bubbles/list.Model` with built-in `/` filter
-- **detail** — viewport with `glamour` markdown rendering where applicable
-- **form** — `huh.Form` with field validation; `esc` cancels
-
-Common keys inside a screen:
+Every list/table screen accepts:
 
 | Key | Action |
 |-----|--------|
-| `enter` | open detail (or, in two-pane screens, focus into the right pane) |
 | `n` | new entry |
 | `e` | edit selected |
-| `d` | delete selected (always followed by a `y`/`n` confirm dialog) |
+| `d` | delete selected (with `y/n` confirm) |
+| `o` | open URL externally (where applicable) |
+| `/` | filter list (built-in) |
+| `f` | cycle filter pill |
+| `s` | cycle sort |
 | `r` | refresh |
-| `tab` | switch between left/right or tabs |
-| `/` | filter list |
-| `ctrl+e` (form) | open `$EDITOR` on a tmpfile and reload |
 
-## Notes-specific
+## Form mode
 
-- Two-pane: folder tree on the left, notes on the right.
-- `f` creates a new folder.
-- Tags entered as comma-separated strings.
+| Key | Action |
+|-----|--------|
+| `tab` / `shift+tab` | next / previous field |
+| `enter` | new line inside body textareas |
+| `ctrl+e` | open body in `$EDITOR` (notes, journal) |
+| `ctrl+s` | save form |
+| `esc` | cancel |
 
-## Journal-specific
+## Command palette (`:`)
 
-- Calendar dot markers show dates with entries (loaded from `GET /journal`).
-- `← / →` step day; `↑ / ↓` step week; `t` jumps to today; `n / p` aliases.
+K9s-style overlay. Type to filter, `tab` to autocomplete, `↵` to run, `esc`
+to cancel. Always includes:
 
-## Habits-specific
+- Every screen by name (`tasks`, `notes`, `journal`, …)
+- `help`, `quit`, `refresh`
+- Per-screen heavy actions exposed via `PaletteCommands()`:
 
-- 30-day history rendered as `■` (done) / `·` (empty).
-- `space` toggles today; `t` toggles a chosen date (date picker not yet
-  implemented — current cursor only).
+| Command | Screen |
+|---------|--------|
+| `auto-schedule`, `agenda` | Tasks |
+| `all-notes` | Notes |
+| `trends` | Health |
+| `force-refresh` | Feeds |
+| `export`, `test-notify` | Settings |
+| `new-conversation`, `clear-history`, `model-nova-lite`, `model-nova-pro` | Assistant |
 
-## Tasks-specific
+## Per-screen interactions
 
+### Notes
+- Folder browser is the entry point. Each folder shows note count; "All
+  notes" is always present at the top.
+- `↵` on a folder drills into the filtered notes list.
+- `↵` on a note opens the detail (markdown via `glamour`).
+- `e` on detail opens the edit form (title, body, tags). Folder is fixed
+  to the current filter — no folder picker in the form.
+
+### Journal
+- Calendar dots on dates with entries (loaded from `GET /journal`).
+- `↑↓ ←→` step week/day; `t` jumps to today.
+- Mood is a select (`great/good/okay/bad/terrible`); body via `enter` =
+  newline + `ctrl+e` = `$EDITOR`.
+
+### Tasks
 - Filter pills cycle on `f` (all → todo → in-progress → done).
 - Sort cycles on `s` (smart → due → priority → title).
-- `c` opens the 7-day agenda; `a` triggers `/tasks/auto-schedule`.
+- `:auto-schedule` reschedules unscheduled tasks via the API.
+- `:agenda` shows the next 7 days from `/tasks/calendar`.
 
-## Health / Nutrition
+### Habits
+- 30-day history rendered as `■` (done) / `·` (empty).
+- `space` toggles today.
 
-- Day-keyed: `← / →` step day, `t` jumps to today.
-- Health: `e` edits totals, `T` shows 7-day summary stats (no charts).
-- Nutrition: `n` adds a meal, `x` removes the last meal, `d` deletes the day.
+### Health
+- Date picker top bar: `←/→` step day, `t` jumps to today.
+- `:trends` opens the 7-day summary.
+- Foods + exercises tracked together; nutrition has no separate screen.
 
-## Finances
-
+### Finances
 - `tab` cycles tabs (debts / income / expenses).
 - Summary header pulls from `/finances/summary`.
 
-## Feeds
+### Feeds
+- Left pane feeds, right pane articles. `tab` switches panes.
+- `↵` opens article inline via `/feeds/article-text`.
+- `o` opens externally, `h` favorites, `r` marks read.
+- `:force-refresh` re-fetches articles bypassing the 30-min cache.
 
-- Left pane: feeds list. Right pane: articles list.
-- `enter` opens the article in an inline reader (calls
-  `/feeds/article-text`). `o` opens externally. `h` favorites.
-  `r` (in detail) marks read.
+### Bookmarks / Favorites
+- Standard list table. `o` opens the URL externally.
 
-## Assistant
-
-- Three panes: conversations (left), messages (centre, viewport), input
-  (bottom textarea). `tab` cycles focus.
-- `ctrl+j` sends. `ctrl+m` toggles model (nova-lite / nova-pro). `ctrl+l`
-  clears the current conversation. `ctrl+n` starts a new one.
+### Assistant
+- Three panes: conversations (left), messages (center, viewport), input
+  (bottom textarea). `tab` cycles panes.
+- `ctrl+s` sends. `ctrl+l` clears the current conversation.
+- Model + new-conversation switching via the palette (`:model-nova-lite`,
+  `:new-conversation`).
 - Streaming is not used; a spinner indicates "sending" and the reply is
-  rendered all at once via glamour.
+  rendered all at once via `glamour`.
 
-## Settings
+### Settings
+- Sectioned read-only view; `e` opens an edit form.
+- `:export` triggers `/export` and prints the presigned URL.
+- `:test-notify` sends a test ntfy notification.
 
-- Sectioned read-only view.
-- `e` opens an edit form; `x` triggers `/export` and prints the presigned
-  URL; `T` sends a test ntfy notification.
+### Tokens
+- When the API returns 403 to `GET /tokens` (PAT auth), the screen shows
+  a banner and disables create/delete.
+- After create, the plaintext token is shown once in a centred dialog;
+  `↵` or `esc` dismisses.
 
-## Tokens
-
-- When the API returns 403 to `GET /tokens` (PAT auth), the screen displays
-  a banner and disables `n` / `d`.
-- After create, the plaintext token is shown once in a centred dialog.
-  `enter` or `esc` dismisses.
-
-## Admin
-
-- Two read-only tables (Costs and Stats). The screen stays available but
-  prints "(unavailable)" when the API responds with 4xx for non-admin users.
+### Admin
+- Two read-only tables (Costs and Stats). Renders "(unavailable)" for
+  non-admin users.
 
 ## Theming
 
-- Adaptive colour palette (`internal/styles/styles.go`) auto-switches based
-  on terminal background.
-- Primary indigo `#4f46e5` / `#818cf8`, accent amber `#d97706` / `#f59e0b`.
-- `--no-color` (or `NO_COLOR=1`) disables coloured output.
+- Adaptive colour palette (`internal/styles/styles.go`) auto-switches with
+  terminal background.
+- Primary cyan, accent amber. Borders rounded by default.
+- Tables stripe odd rows with a subtle tinted background; even rows render
+  at terminal default for clear alternation.
+- `--no-color` (or `NO_COLOR=1`) disables colour entirely.

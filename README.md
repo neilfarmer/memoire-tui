@@ -127,62 +127,132 @@ Generate a Personal Access Token in the web UI under **Settings → API Tokens**
 
 ## Keys
 
-Global:
+The TUI uses an implicit focus model: at boot, focus is on the sidebar; `↵` drills into content; `esc` walks back up.
+
+**Global**
 
 | Key | Action |
 |-----|--------|
+| `↑/↓` | move cursor (sidebar when focused, table rows when content is focused) |
+| `↵ enter` | drill in (sidebar → screen → detail/form) |
+| `esc` | back one level (drill up → sidebar focus → quit confirm) |
+| `:` | open command palette |
 | `?` | toggle help overlay |
-| `ctrl+q` | quit |
-| `1`–`9` | jump to the first 9 sidebar entries |
-| `g <letter>` | leader nav (`g t` = tasks, `g n` = notes, …) |
 | `ctrl+r` | refresh current screen |
+| `ctrl+q` | force quit |
 
-Per-screen keys are listed in the help overlay and the bottom status bar.
+**Universal per-screen actions** (any list/detail screen)
+
+| Key | Action |
+|-----|--------|
+| `n` | new entry |
+| `e` | edit selected |
+| `d` | delete selected (with `y/n` confirm) |
+| `o` | open URL externally (where applicable) |
+| `/` | filter list (built-in) |
+| `f` | cycle filter pill |
+| `s` | cycle sort |
+| `r` | refresh |
+
+**Form mode** (any huh-form screen)
+
+| Key | Action |
+|-----|--------|
+| `tab / shift+tab` | next / previous field |
+| `enter` | new line inside body textareas |
+| `ctrl+e` | open body in `$EDITOR` (notes, journal) |
+| `ctrl+s` | save form |
+| `esc` | cancel |
+
+**Command palette** (`:`)
+
+Filterable, k9s-style. Always includes screen jumps + heavy actions exposed by the current screen:
+
+| Command | Screen | Action |
+|---------|--------|--------|
+| `auto-schedule`, `agenda` | Tasks | reschedule unscheduled tasks; agenda for next 7 days |
+| `all-notes` | Notes | skip folder filter |
+| `trends` | Health | 7-day summary |
+| `force-refresh` | Feeds | force re-fetch articles |
+| `export`, `test-notify` | Settings | export ZIP / send test ntfy |
+| `new-conversation`, `clear-history`, `model-nova-lite`, `model-nova-pro` | Assistant | conversation + model controls |
+| `help`, `quit`, `refresh` | Anywhere | global actions |
+| `dashboard`, `tasks`, `notes`, … | Anywhere | jump to any screen by name |
+
+Per-screen keys also appear in the help overlay (`?`) and the bottom status bar.
 
 ## Screens
 
 | Screen | Notes |
 |--------|-------|
 | Dashboard | Today's tasks / habits / latest note summary |
-| Tasks | Filter / sort / group + create-edit-delete + auto-schedule + 7-day agenda |
-| Notes | Folder tree + markdown rendering. `ctrl+e` in the body editor opens `$EDITOR`. |
-| Journal | Month calendar with markers; one entry per day; mood + tags |
+| Tasks | Filter pills (all / todo / in-progress / done), sort cycle, table view. `:auto-schedule` and `:agenda` via palette. |
+| Notes | Folder browser is the entry point: each folder shows note count; enter drills into the filtered notes list. Markdown rendering in detail; `ctrl+e` in the form opens `$EDITOR`. |
+| Journal | Month calendar with day markers; one entry per day; mood + tags |
 | Habits | 30-day ASCII history per habit; `space` toggles today |
 | Goals | Status filter + form |
-| Health | Date picker, totals, foods, exercises, 7-day summary |
-| Nutrition | Date picker, meal log, totals row |
+| Health | Date picker, totals, foods, exercises. `:trends` palette command for the 7-day summary. |
 | Finances | Tabs: debts / income / expenses + summary header |
-| Feeds | Two-pane (feeds / articles); inline article reader; favorite + mark read |
+| Feeds | Two-pane (feeds / articles); inline article reader; favorite + mark read; `:force-refresh` palette command |
 | Bookmarks | Search + tag filter |
 | Favorites | Tag filter + remove |
-| Settings | Account / Appearance / Notifications / Editor + export + test-notification |
-| Tokens | List / create. Disabled and labeled when session is PAT-authenticated. |
-| Assistant | Multi-turn chat with model picker + conversations. Spinner-then-render (no streaming). |
-| Admin | Costs + DynamoDB / S3 stats. Sidebar entry stays available; the screen shows "(unavailable)" for non-admin users. |
+| Settings | Account / Appearance / Notifications / Editor; `:export` and `:test-notify` palette commands |
+| Tokens | List / create. Disabled with banner when session is PAT-authenticated. |
+| Assistant | Multi-turn chat with conversations + model picker. Palette: `:new-conversation`, `:clear-history`, `:model-nova-lite`, `:model-nova-pro`. Spinner-then-render (no streaming). |
+| Admin | Costs + DynamoDB / S3 stats. Renders "(unavailable)" for non-admin users. |
 
-Diagrams (canvas-based) is intentionally not in the TUI.
+Not in the TUI:
+
+- **Diagrams** (canvas-based) — terminal can't render the SPA's editing surface.
+- **Nutrition** — backend has no separate `/nutrition` endpoint; nutrition data lives under `/health/{date}` foods. Use the Health screen.
 
 ## Running tests
 
 ```bash
-make test              # go test ./...
-make lint              # go vet + gofmt
+make test              # go test ./... -count=1 -race
+make test-cover        # coverage report
+make lint              # go vet + gofmt -l
 make security          # govulncheck
+make build             # bin/memoire
+make run               # go run ./cmd/memoire
+```
+
+## Logs
+
+The binary writes a structured debug log on every run. Default destination is `/tmp/memoire-tui.log`. Override with `MEMOIRE_LOG=path` or disable with `MEMOIRE_LOG=off`.
+
+Each entry is a single key=value text line: `key event`, `activate screen`, `api response`, `api error`. To capture panics + stack traces, run the binary with stderr redirected:
+
+```bash
+./bin/memoire 2>/tmp/memoire-stderr.log
 ```
 
 ## Layout
 
 ```
-cmd/memoire/main.go             # entry point
+cmd/
+  memoire/main.go               # entry point
+  smoke/main.go                 # dev-only screen-frame dumper
 internal/
-  api/                          # HTTP client per feature
+  api/                          # HTTP client per feature (one file per feature)
   config/                       # TOML + env loader, first-run prompt
+  logx/                         # file-based debug log
   styles/                       # adaptive color palette + shared lipgloss styles
   ui/
-    app.go                      # root model + screen routing
-    keys.go                     # global key bindings
-    messages.go                 # tea.Msg types
+    app.go                      # root model + screen routing + palette + esc drill-up
     factories.go                # screen factory map
-    components/                 # sidebar, statusbar, header, confirm, help, markdown, editor, opener, datepicker, asciichart
-    screens/                    # one Model per feature
+    keys.go                     # screen ordering + sidebar icons
+    messages.go                 # tea.Msg types
+    components/
+      sidebar.go statusbar.go header.go    # chrome
+      confirm.go help.go palette.go        # overlays
+      markdown.go editor.go opener.go      # external integrations
+      datepicker.go asciichart.go          # widgets
+      table.go                              # NewTable wrapping the striped fork
+      formkeys.go                           # huh keymap (enter = newline)
+      striped/                              # vendored fork of bubbles/table v1.0.0
+                                            # with a per-row RowStyler hook
+    screens/                                # one Model per feature
 ```
+
+The `striped` package is a forked copy of `charmbracelet/bubbles@v1.0.0/table` with a single addition: `Styles.RowStyler func(rowIndex int) lipgloss.Style`. The forked `renderRow` runs the hook to layer per-row backgrounds without smuggling ANSI through `runewidth.Truncate`.

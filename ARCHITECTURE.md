@@ -2,7 +2,10 @@
 
 ## Status
 
-Design locked. Implementation starting.
+Shipped as a separate Go module + binary at `github.com/neilfarmer/memoire-tui`.
+This document captures the still-current design decisions; concrete file layout
+is in [`README.md`](README.md), per-feature endpoint mapping in
+[`FEATURES.md`](FEATURES.md), interaction details in [`UX.md`](UX.md).
 
 ---
 
@@ -26,65 +29,23 @@ Design locked. Implementation starting.
 
 ## Project Layout
 
-```
-tui/
-  cmd/
-    memoire/
-      main.go            # Entry: load config, init API client, run tea.Program
-  internal/
-    api/                 # HTTP client layer
-      client.go          # Base client: PAT auth header, base URL, error parsing
-      tasks.go           # Task + folder endpoints
-      notes.go           # Note + folder + attachment endpoints
-      habits.go          # Habit + habit_logs_v2 endpoints
-      journal.go         # Journal entry endpoints
-      goals.go           # Goals endpoints
-      health.go          # Health log endpoints
-      nutrition.go       # Nutrition log endpoints
-      finances.go        # Debts + income + fixed_expenses endpoints
-      feeds.go           # Feed + articles endpoints
-      bookmarks.go       # Bookmark endpoints
-      diagrams.go        # Diagram endpoints
-      favorites.go       # Favorites endpoints
-      settings.go        # Settings endpoints
-      assistant.go       # Assistant chat endpoints (streaming)
-      tokens.go          # PAT management (JWT-only; flag if accessed via PAT)
-      export.go          # Export endpoint
-    ui/
-      app.go             # Root model: screen routing, sidebar state, global key handler
-      screens/           # One Bubble Tea Model per feature
-        dashboard.go     # Home/overview: counts, recent items
-        tasks.go         # Task list + detail + create/edit
-        notes.go         # Note list + editor
-        habits.go        # Habit tracker + log entry
-        journal.go       # Journal entry per day (date nav)
-        goals.go         # Goal list + detail
-        health.go        # Health log list + entry form
-        nutrition.go     # Nutrition log list + entry form
-        finances.go      # Debts / income / expenses tabs
-        feeds.go         # Feed list + article list + reader
-        bookmarks.go     # Bookmark list + detail
-        diagrams.go      # Diagram list; JSON view or external open (adaptation)
-        favorites.go     # Favorites list
-        settings.go      # Settings key/value editor
-        assistant.go     # Chat screen with streaming output
-        tokens.go        # PAT list + create (JWT-only note)
-      components/        # Shared widgets
-        statusbar.go     # Bottom bar: screen name, mode, flash message, key hints
-        confirm.go       # Delete confirmation dialog (y/n)
-        help.go          # Keybinding overlay (? to toggle)
-        header.go        # Top bar: app name, current section, connection status
-        sidebar.go       # Left nav: section list, keyboard + mouse nav
-    config/
-      config.go          # Load config: env vars > config file
-    styles/
-      styles.go          # Lipgloss styles, adaptive color palette
-  go.mod
-  go.sum
-  ARCHITECTURE.md        # This file
-  FEATURES.md            # Feature-by-feature API + interaction map (memoire-expert)
-  UX.md                  # Layout, keybindings, patterns (tui-expert)
-```
+The full as-shipped layout lives in [`README.md`](README.md). The original
+locked design predicted:
+
+- one `internal/api/<feature>.go` per memoire feature (kept)
+- one `internal/ui/screens/<feature>.go` per screen (kept; nutrition + diagrams
+  removed — see "Feature Adaptation Notes" below)
+- shared `components/` for chrome (kept; gained `palette.go`,
+  `formkeys.go`, `striped/`)
+
+Two changes from the original spec worth highlighting:
+
+- **No Nutrition screen.** The memoire backend has no `/nutrition` endpoint;
+  nutrition data lives under `/health/{date}` foods. Use Health.
+- **`internal/ui/components/striped/`** is a vendored fork of
+  `charmbracelet/bubbles@v1.0.0/table` that adds a per-row
+  `Styles.RowStyler` hook so we can paint alternating row backgrounds
+  without smuggling ANSI through `runewidth.Truncate`.
 
 ---
 
@@ -116,16 +77,35 @@ pat = "pat_abc123"
 
 ---
 
-## Screen Routing
+## Screen Routing & Focus Model
 
-The root `app.Model` holds:
-- `currentScreen Screen` — which feature is active
-- `screens map[Screen]tea.Model` — lazy-initialized screen models (initialized on first visit)
-- `sidebar sidebarModel` — navigation state
-- `statusBar statusBarModel` — shared status/message bar
-- `flashMsg string`, `flashExpiry time.Time` — transient status messages
+The root `App` (`internal/ui/app.go`) holds:
+- `current Screen` — which feature is active
+- `sideCursor int` — index into `SidebarOrder`; tracks the sidebar selection
+- `sideFocus bool` — true when the sidebar owns arrow keys; false when content does
+- `registry map[Screen]screens.Screen` — lazy-initialized screen models
+- `factories map[Screen]ScreenFactory` — registered screen constructors
+- `helpOpen`, `paletteOpen`, `quitConfirm` — overlay states
+- `flash`, `flashLevel`, `flashID` — transient status with auto-dismiss
 
-Screen transitions happen via a `NavigateTo(screen)` message. The sidebar and number-key shortcuts both emit this message.
+**Implicit focus model.** No explicit focus toggle key. The user moves
+through depth via `enter` (drill in) and `esc` (drill up):
+
+```
+sidebar → screen list → detail / form → form-field text-input
+   ↑       ↑              ↑                  ↑
+   └── esc — esc ────────┘                  esc cancels form
+                                            (or ctrl+s saves)
+```
+
+`OnEscape() bool` is implemented by every screen with sub-modes; App calls
+it when content is focused and falls back to `sideFocus = true` if the
+screen reports it's already at the top. Pressing esc while the sidebar is
+focused opens the quit confirm.
+
+A k9s-style command palette (`:`) overlays a filterable command list.
+Screens contribute heavy actions via `PaletteCommands() []components.Command`;
+the App always adds screen-jump and global commands.
 
 ---
 
@@ -153,34 +133,44 @@ Loading states use `spinner.Model`. Errors surface in the status bar with a 4-se
 
 | Feature | Adaptation |
 |---------|-----------|
-| Diagrams | List view only. Detail shows JSON elements. "Open in editor" via `$EDITOR`. Canvas editing not possible in terminal. |
+| Diagrams | Excluded — terminal can't render the SPA's canvas editor. |
+| Nutrition | Excluded — backend has no `/nutrition` endpoint; nutrition data lives under `/health/{date}` foods. |
 | Note images/attachments | List attachment filenames. "Open" key launches `xdg-open`/`open` with presigned URL via `$BROWSER`. |
-| Note rich text | Render markdown via `glamour` (charmbracelet/glamour) in a `viewport.Model`. Edit in `$EDITOR` (tmp file, write back). |
-| Assistant chat | Streaming via SSE or polling. Multiline input via `$EDITOR` or textarea. Output in scrollable viewport. |
-| Export | Trigger download, display presigned URL or save path. No ZIP extraction in TUI. |
-| Home/admin | Read-only stats table. Only visible when user ID is in ADMIN_USER_IDS (checked via API response). |
+| Note rich text | Render markdown via `glamour` (charmbracelet/glamour, fixed dark style). Edit in `$EDITOR` (tmp file, write back) via `ctrl+e`. |
+| Assistant chat | Spinner-then-render (no streaming — backend returns full reply). Multiline input via `enter` (rebound to newline by `formkeys.go`) or `ctrl+e`. Output in scrollable viewport. |
+| Export | Trigger via `:export` palette command, display presigned URL. No ZIP extraction in TUI. |
+| Admin | Read-only stats table. Renders "(unavailable)" for non-admin users. |
 | Feeds articles | Read articles inline via viewport. External open via `$BROWSER` for full page. |
+| Notes folders | Folder browser is the entry point; `enter` drills into a filtered notes list. |
 
 ---
 
-## Dependencies and Task Order
+## Stability notes
 
-```
-Task #1 (architecture)  — architect          [DONE when this doc is written]
-Task #2 (feature map)   — memoire-expert     [parallel with #3]
-Task #3 (UX doc)        — tui-expert         [parallel with #2]
-Task #4 (Go bootstrap)  — golang-expert      [after #1; outputs: go.mod, client.go, app.go skeleton]
-Task #5 (screens)       — all               [after #2, #3, #4; split into per-feature subtasks]
-```
+A few patterns that bit the early implementation and are now load-bearing
+constraints:
 
-Task #5 will be broken into per-feature subtasks once #2 (FEATURES.md) and #3 (UX.md) land and the Go skeleton is buildable.
+- **Pin a fixed colour profile up front** (`lipgloss.SetColorProfile(termenv.TrueColor)`).
+  Auto-detection issues an OSC 11 background-colour query against the terminal,
+  which on some terminals (Ghostty, certain iTerm/tmux combos) replies via
+  stdin. bubbletea reads the reply as fake key events and the resulting
+  feedback loop freezes the program.
+- **Pin glamour's style** (`glamour.WithStandardStyle("dark")`). The default
+  `WithAutoStyle` does the same OSC query per render and reproduces the
+  freeze inside any markdown panel.
+- **Use `tea.ExecProcess` for `$EDITOR`.** Calling `exec.Command.Run()` while
+  bubbletea owns the terminal corrupts the alt-screen.
+- **Don't smuggle ANSI into bubbles/table cell values.** Its renderRow calls
+  `runewidth.Truncate` BEFORE applying the cell style, miscounts byte length
+  vs display width, and chops the ANSI mid-sequence. The `striped` fork
+  exposes a per-row style hook so backgrounds layer at renderRow time.
+- **Drop `Padding(0, 1)` from bubbles/table Cell + Header.** The default
+  padding adds 2 chars per column at render time, exceeding the column
+  widths the screen calculated, wrapping rows onto a second line. Keep the
+  total predictable by zeroing the padding.
 
----
+## Key design constraints (from CLAUDE.md)
 
-## Key Design Constraints (from CLAUDE.md)
-
-- No emojis anywhere — not in UI strings, help text, status bar, or comments.
-- New code lives under `tui/` only. The existing Python/Terraform codebase is untouched.
-- Feature branch only; no push to main without user confirmation.
-- Go module path: `github.com/neilfarmer/memoire/tui` (adjust if repo path differs).
-- No build step for the existing frontend; TUI is a separate binary.
+- No emojis anywhere — UI strings, help text, status bar, comments.
+- Single static binary. No CGO.
+- Conventional Commits + release-please for version automation.
