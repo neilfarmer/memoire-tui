@@ -15,7 +15,6 @@ type GlobalKeys struct {
 	Habits    key.Binding
 	Goals     key.Binding
 	Health    key.Binding
-	Nutrition key.Binding
 	Finances  key.Binding
 	Feeds     key.Binding
 	Bookmarks key.Binding
@@ -51,7 +50,6 @@ var SidebarOrder = []Screen{
 	ScreenHabits,
 	ScreenGoals,
 	ScreenHealth,
-	ScreenNutrition,
 	ScreenFinances,
 	ScreenFeeds,
 	ScreenBookmarks,
@@ -71,7 +69,6 @@ var SidebarIcons = map[Screen]string{
 	ScreenHabits:    "◉",
 	ScreenGoals:     "◈",
 	ScreenHealth:    "♥",
-	ScreenNutrition: "♦",
 	ScreenFinances:  "$",
 	ScreenFeeds:     "≋",
 	ScreenBookmarks: "⚓",
@@ -99,7 +96,6 @@ var SidebarLabels = map[Screen]string{
 	ScreenHabits:    "Habits",
 	ScreenGoals:     "Goals",
 	ScreenHealth:    "Health",
-	ScreenNutrition: "Nutrition",
 	ScreenFinances:  "Finances",
 	ScreenFeeds:     "Feeds",
 	ScreenBookmarks: "Bookmarks",

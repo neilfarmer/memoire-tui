@@ -319,3 +319,6 @@ func (j *Journal) Help() []components.HelpEntry {
 	}
 }
 func (j *Journal) SetSize(w, h int) { j.width, j.height = w, h }
+
+// IsTextEditing reports that a form is active.
+func (j *Journal) IsTextEditing() bool { return j.mode == journalForm }

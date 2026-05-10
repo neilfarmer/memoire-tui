@@ -389,3 +389,6 @@ func (g *Goals) SetSize(w, h int) {
 		g.tbl.SetHeight(h - 8)
 	}
 }
+
+// IsTextEditing reports that a form is active.
+func (g *Goals) IsTextEditing() bool { return g.mode == goalForm }

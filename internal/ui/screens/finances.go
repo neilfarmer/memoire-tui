@@ -578,3 +578,6 @@ func (f *Finances) Help() []components.HelpEntry {
 	}
 }
 func (f *Finances) SetSize(w, h int) { f.width, f.height = w, h }
+
+// IsTextEditing reports that a form is active.
+func (f *Finances) IsTextEditing() bool { return f.mode == financeForm }

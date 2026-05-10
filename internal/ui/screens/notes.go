@@ -655,3 +655,6 @@ func (n *Notes) SetSize(w, h int) {
 		n.folderTbl.SetHeight(h - 8)
 	}
 }
+
+// IsTextEditing reports that a form/textarea is active.
+func (n *Notes) IsTextEditing() bool { return n.mode == noteForm || n.mode == noteFolderForm }

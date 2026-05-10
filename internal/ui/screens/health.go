@@ -335,3 +335,6 @@ func (h *Health) Help() []components.HelpEntry {
 	}
 }
 func (h *Health) SetSize(w, ht int) { h.width, h.height = w, ht }
+
+// IsTextEditing reports that a form is active.
+func (h *Health) IsTextEditing() bool { return h.mode == healthForm }

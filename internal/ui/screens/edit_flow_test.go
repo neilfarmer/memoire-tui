@@ -393,25 +393,6 @@ func TestHealthEditFlow(t *testing.T) {
 	}
 }
 
-func TestNutritionAddMealFlow(t *testing.T) {
-	fb := newFakeBackend(t)
-	s := newNutrition(fb.client())
-	m := runScreen(t, s)
-	n := m.(*Nutrition)
-	n.formIn = mealFormState{name: "Eggs", calories: "200"}
-	drainCmd(t, n, n.submitMeal())
-	found := false
-	for _, c := range fb.calls {
-		if strings.HasPrefix(c, "PUT /nutrition/") {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Errorf("nutrition upsert missing; saw %v", fb.calls)
-	}
-}
-
 func TestSettingsUpdateFlow(t *testing.T) {
 	fb := newFakeBackend(t)
 	s := newSettings(fb.client())

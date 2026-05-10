@@ -355,3 +355,6 @@ func (b *Bookmarks) SetSize(w, h int) {
 		b.tbl.SetHeight(h - 6)
 	}
 }
+
+// IsTextEditing reports that a form is active.
+func (b *Bookmarks) IsTextEditing() bool { return b.mode == bookmarkForm }

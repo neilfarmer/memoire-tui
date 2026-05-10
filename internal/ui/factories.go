@@ -25,7 +25,6 @@ func DefaultFactories(client *api.Client) map[Screen]ScreenFactory {
 	out[ScreenHabits] = func(c *api.Client) screens.Screen { return screens.NewHabits(c) }
 	out[ScreenGoals] = func(c *api.Client) screens.Screen { return screens.NewGoals(c) }
 	out[ScreenHealth] = func(c *api.Client) screens.Screen { return screens.NewHealth(c) }
-	out[ScreenNutrition] = func(c *api.Client) screens.Screen { return screens.NewNutrition(c) }
 	out[ScreenFinances] = func(c *api.Client) screens.Screen { return screens.NewFinances(c) }
 	out[ScreenFeeds] = func(c *api.Client) screens.Screen { return screens.NewFeeds(c) }
 	out[ScreenBookmarks] = func(c *api.Client) screens.Screen { return screens.NewBookmarks(c) }

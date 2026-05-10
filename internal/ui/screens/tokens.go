@@ -282,3 +282,6 @@ func (t *Tokens) Help() []components.HelpEntry {
 	}
 }
 func (t *Tokens) SetSize(w, h int) { t.width, t.height = w, h }
+
+// IsTextEditing reports that a form is active.
+func (t *Tokens) IsTextEditing() bool { return t.mode == tokenForm }

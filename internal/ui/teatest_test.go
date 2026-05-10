@@ -111,3 +111,25 @@ func TestEndToEnd_OSCResponseDoesNotFreeze(t *testing.T) {
 	tm.Send(tea.Quit())
 	tm.WaitFinished(t, teatest.WithFinalTimeout(2*time.Second))
 }
+
+// TestEndToEnd_QuestionMarkInAssistantDoesNotOpenHelp verifies the fix for
+// issue #4: pressing '?' inside the assistant input must reach the textarea
+// rather than toggle the global help overlay.
+func TestEndToEnd_QuestionMarkInAssistantDoesNotOpenHelp(t *testing.T) {
+	srv := fakeServer(t)
+	client := api.New(srv.URL, "pat_test")
+	app := New(client, DefaultFactories(client))
+
+	// Pre-activate the assistant screen so its IsTextEditing reports true.
+	app.sideFocus = false
+	app.sideCursor = 0
+	app.activate(ScreenAssistant)
+	app.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Send '?' directly to the App. With the fix, the global handler must
+	// short-circuit and the help overlay must NOT open.
+	app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
+	if app.helpOpen {
+		t.Errorf("help overlay should not toggle while assistant input is focused")
+	}
+}

@@ -584,3 +584,6 @@ func (t *Tasks) SetSize(w, h int) {
 		t.tbl.SetHeight(h - 8)
 	}
 }
+
+// IsTextEditing reports that a form/textarea is active.
+func (t *Tasks) IsTextEditing() bool { return t.mode == taskForm }

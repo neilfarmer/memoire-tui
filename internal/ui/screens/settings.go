@@ -315,3 +315,6 @@ func (s *Settings) Help() []components.HelpEntry {
 	}
 }
 func (s *Settings) SetSize(w, h int) { s.width, s.height = w, h }
+
+// IsTextEditing reports that a form is active.
+func (s *Settings) IsTextEditing() bool { return s.mode == settingsEdit }

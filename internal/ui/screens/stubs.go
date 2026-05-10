@@ -13,7 +13,6 @@ func NewJournal(c *api.Client) Screen   { return newJournal(c) }
 func NewHabits(c *api.Client) Screen    { return newHabits(c) }
 func NewGoals(c *api.Client) Screen     { return newGoals(c) }
 func NewHealth(c *api.Client) Screen    { return newHealth(c) }
-func NewNutrition(c *api.Client) Screen { return newNutrition(c) }
 func NewFinances(c *api.Client) Screen  { return newFinances(c) }
 func NewFeeds(c *api.Client) Screen     { return newFeeds(c) }
 func NewBookmarks(c *api.Client) Screen { return newBookmarks(c) }

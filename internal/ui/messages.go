@@ -13,7 +13,6 @@ const (
 	ScreenHabits    Screen = "habits"
 	ScreenGoals     Screen = "goals"
 	ScreenHealth    Screen = "health"
-	ScreenNutrition Screen = "nutrition"
 	ScreenFinances  Screen = "finances"
 	ScreenFeeds     Screen = "feeds"
 	ScreenBookmarks Screen = "bookmarks"
