@@ -6,11 +6,83 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), Lipgloss, B
 
 ## Install
 
-From a checkout of this repo:
+Pre-built binaries land on every [GitHub Release](https://github.com/neilfarmer/memoire-tui/releases). The snippets below grab the latest version, drop the binary at `~/.local/bin/memoire`, and never need `sudo`.
+
+Make sure `~/.local/bin` is on your `PATH`. If not, add this once:
 
 ```bash
-make build             # builds bin/memoire
-./bin/memoire          # run
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc   # or ~/.bashrc
+```
+
+### macOS (Apple Silicon)
+
+```bash
+mkdir -p ~/.local/bin
+URL=$(curl -fsSL https://api.github.com/repos/neilfarmer/memoire-tui/releases/latest \
+  | grep -oE '"browser_download_url": *"[^"]+darwin_arm64\.tar\.gz"' \
+  | head -1 | cut -d'"' -f4)
+curl -fsSL "$URL" | tar -xzf - -C ~/.local/bin memoire
+chmod +x ~/.local/bin/memoire
+xattr -d com.apple.quarantine ~/.local/bin/memoire 2>/dev/null || true
+memoire --version
+```
+
+(Drop `xattr` if you don't see the macOS quarantine prompt.)
+
+### macOS (Intel)
+
+```bash
+mkdir -p ~/.local/bin
+URL=$(curl -fsSL https://api.github.com/repos/neilfarmer/memoire-tui/releases/latest \
+  | grep -oE '"browser_download_url": *"[^"]+darwin_x86_64\.tar\.gz"' \
+  | head -1 | cut -d'"' -f4)
+curl -fsSL "$URL" | tar -xzf - -C ~/.local/bin memoire
+chmod +x ~/.local/bin/memoire
+memoire --version
+```
+
+### Linux x86_64
+
+```bash
+mkdir -p ~/.local/bin
+URL=$(curl -fsSL https://api.github.com/repos/neilfarmer/memoire-tui/releases/latest \
+  | grep -oE '"browser_download_url": *"[^"]+linux_x86_64\.tar\.gz"' \
+  | head -1 | cut -d'"' -f4)
+curl -fsSL "$URL" | tar -xzf - -C ~/.local/bin memoire
+chmod +x ~/.local/bin/memoire
+memoire --version
+```
+
+### Linux arm64
+
+```bash
+mkdir -p ~/.local/bin
+URL=$(curl -fsSL https://api.github.com/repos/neilfarmer/memoire-tui/releases/latest \
+  | grep -oE '"browser_download_url": *"[^"]+linux_arm64\.tar\.gz"' \
+  | head -1 | cut -d'"' -f4)
+curl -fsSL "$URL" | tar -xzf - -C ~/.local/bin memoire
+chmod +x ~/.local/bin/memoire
+memoire --version
+```
+
+### Verify checksums (optional)
+
+```bash
+URL=$(curl -fsSL https://api.github.com/repos/neilfarmer/memoire-tui/releases/latest \
+  | grep -oE '"browser_download_url": *"[^"]+checksums\.txt"' \
+  | head -1 | cut -d'"' -f4)
+curl -fsSL "$URL"
+```
+
+Match the line for your archive against the `sha256sum` output of the file you downloaded.
+
+### Build from source
+
+```bash
+git clone https://github.com/neilfarmer/memoire-tui
+cd memoire-tui
+make build            # produces bin/memoire
+./bin/memoire
 ```
 
 Or directly with Go:
@@ -18,9 +90,6 @@ Or directly with Go:
 ```bash
 go run ./cmd/memoire
 ```
-
-Pre-built binaries for darwin / linux / windows (amd64 + arm64) are attached
-to each [GitHub Release](https://github.com/neilfarmer/memoire-tui/releases).
 
 ## First-run setup
 
