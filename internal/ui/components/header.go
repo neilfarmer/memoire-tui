@@ -50,8 +50,23 @@ func (h Header) View() string {
 	if gap < 1 {
 		gap = 1
 	}
+	// If the right chips would push past the available width, drop them
+	// progressively (least important first) until the bar fits.
+	for rightWidth > h.Width-leftWidth-4 && len(chips) > 0 {
+		chips = chips[:len(chips)-1]
+		right = lipgloss.JoinHorizontal(lipgloss.Top, chips...)
+		rightWidth = lipgloss.Width(right)
+	}
+	gap = h.Width - leftWidth - rightWidth - 2
+	if gap < 1 {
+		gap = 1
+	}
 	bar := lipgloss.JoinHorizontal(lipgloss.Top, left, lipgloss.NewStyle().Width(gap).Render(""), right)
-	rule := lipgloss.NewStyle().Foreground(styles.Border).Render(repeat("─", h.Width))
+	ruleW := h.Width - 2
+	if ruleW < 0 {
+		ruleW = 0
+	}
+	rule := lipgloss.NewStyle().Foreground(styles.Border).Render(repeat("─", ruleW))
 	return lipgloss.JoinVertical(lipgloss.Left,
 		lipgloss.NewStyle().Width(h.Width).Padding(0, 1).Render(bar),
 		rule,
@@ -90,7 +105,7 @@ func Crumbs(parts ...string) string {
 
 // FormHint renders the standard "tab/ctrl+s/esc" hint shown beneath a huh form.
 func FormHint() string {
-	return MutedHint("<tab> next field  <shift+tab> prev  <ctrl+s> save  <esc> cancel")
+	return MutedHint("<tab> next field  <shift+tab> prev  <enter> newline  <ctrl+e> $EDITOR  <ctrl+s> save  <esc> cancel")
 }
 
 // MutedHint wraps a string in muted color.

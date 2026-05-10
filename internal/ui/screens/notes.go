@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -40,8 +39,8 @@ type Notes struct {
 	view      []api.NoteSummary
 	current   api.Note
 	folderID  string // empty = all
-	tbl       table.Model
-	folderTbl table.Model
+	tbl       components.Model
+	folderTbl components.Model
 
 	form           *huh.Form
 	formData       noteFormState
@@ -97,17 +96,20 @@ func shortDate(s string) string {
 }
 
 func folderCols(w int) []components.Column {
-	nameW := w - 14
+	nameW := w - 12
 	if nameW < 16 {
 		nameW = 16
 	}
 	return []components.Column{
-		{Title: "NAME", Width: nameW},
-		{Title: "COLOR", Width: 12},
+		{Title: "FOLDER", Width: nameW},
+		{Title: "NOTES", Width: 10},
 	}
 }
 
-func (n *Notes) Init() tea.Cmd { return n.refresh() }
+func (n *Notes) Init() tea.Cmd {
+	n.mode = noteFolderList
+	return n.refresh()
+}
 
 func (n *Notes) refresh() tea.Cmd {
 	c := n.client
@@ -230,12 +232,20 @@ func (n *Notes) refilter() {
 			shortDate(x.UpdatedAt),
 		})
 	}
-	n.tbl.SetRows(rows)
-	frows := make([]components.Row, 0, len(n.folders))
+	n.tbl.SetRows(components.Stripe(rows, noteCols(n.width-6)))
+	frows := make([]components.Row, 0, len(n.folders)+1)
+	// "All notes" pseudo-folder lets users browse without filtering.
+	frows = append(frows, components.Row{"All notes", fmt.Sprintf("%d", len(n.notes))})
 	for _, f := range n.folders {
-		frows = append(frows, components.Row{f.Name, orDash(f.Color)})
+		count := 0
+		for _, x := range n.notes {
+			if x.FolderID == f.FolderID {
+				count++
+			}
+		}
+		frows = append(frows, components.Row{f.Name, fmt.Sprintf("%d", count)})
 	}
-	n.folderTbl.SetRows(frows)
+	n.folderTbl.SetRows(components.Stripe(frows, folderCols(n.width-6)))
 }
 
 func (n *Notes) folderName(id string) string {
@@ -271,7 +281,7 @@ func (n *Notes) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return n, nil
 	case noteDetail:
 		switch m.String() {
-		case "esc", "q":
+		case "esc":
 			n.mode = noteList
 		case "e":
 			return n, n.startEdit()
@@ -315,21 +325,23 @@ func (n *Notes) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return n, cmd
 	case noteFolderList:
 		switch m.String() {
-		case "esc", "q":
-			n.mode = noteList
 		case "n":
 			return n, n.startFolderForm()
 		case "d":
-			if len(n.folders) > 0 {
+			// Cursor 0 is the synthetic "All notes" entry — never deletable.
+			if n.folderTbl.Cursor() > 0 && len(n.folders) > 0 {
 				n.mode = noteConfirmDeleteFolder
 			}
 		case "enter":
 			idx := n.folderTbl.Cursor()
-			if idx < len(n.folders) {
-				n.folderID = n.folders[idx].FolderID
-				n.refilter()
-				n.mode = noteList
+			if idx == 0 {
+				n.folderID = ""
+			} else if idx-1 < len(n.folders) {
+				n.folderID = n.folders[idx-1].FolderID
 			}
+			n.refilter()
+			n.mode = noteList
+			return n, nil
 		}
 		var cmd tea.Cmd
 		n.folderTbl, cmd = n.folderTbl.Update(m)
@@ -351,41 +363,12 @@ func (n *Notes) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 			n.current = api.Note{NoteID: n.view[idx].NoteID, Title: n.view[idx].Title}
 			n.mode = noteConfirmDelete
 		}
-	case "F":
-		n.mode = noteFolderList
-	case "f":
-		n.cycleFolder()
-	case "X":
-		n.folderID = ""
-		n.refilter()
 	case "r", "ctrl+r":
 		return n, n.refresh()
 	}
 	var cmd tea.Cmd
 	n.tbl, cmd = n.tbl.Update(m)
 	return n, cmd
-}
-
-func (n *Notes) cycleFolder() {
-	if len(n.folders) == 0 {
-		return
-	}
-	if n.folderID == "" {
-		n.folderID = n.folders[0].FolderID
-		n.refilter()
-		return
-	}
-	for i, f := range n.folders {
-		if f.FolderID == n.folderID {
-			if i+1 < len(n.folders) {
-				n.folderID = n.folders[i+1].FolderID
-			} else {
-				n.folderID = ""
-			}
-			n.refilter()
-			return
-		}
-	}
 }
 
 func (n *Notes) openNote(id string) tea.Cmd {
@@ -462,7 +445,7 @@ func (n *Notes) newForm(title string) *huh.Form {
 			huh.NewText().Title("Body (markdown — ctrl+e for $EDITOR)").Value(&d.body).Lines(8),
 			huh.NewInput().Title("Tags (comma separated)").Value(&d.tags),
 		),
-	).WithTheme(huh.ThemeBase())
+	).WithTheme(huh.ThemeBase()).WithKeyMap(components.FormKeyMap())
 }
 
 func (n *Notes) submitForm() tea.Cmd {
@@ -498,7 +481,7 @@ func (n *Notes) startFolderForm() tea.Cmd {
 	n.folderFormName = ""
 	n.folderForm = huh.NewForm(huh.NewGroup(
 		huh.NewInput().Title("Folder name").Value(&n.folderFormName).Validate(notEmpty),
-	))
+	)).WithKeyMap(components.FormKeyMap())
 	n.mode = noteFolderForm
 	return n.folderForm.Init()
 }
@@ -544,20 +527,20 @@ func (n *Notes) View() string {
 	case noteFolderList:
 		return n.folderListView()
 	}
-	folderLabel := "All folders"
+	folderLabel := "All notes"
 	if n.folderID != "" {
-		folderLabel = "Folder: " + n.folderName(n.folderID)
+		folderLabel = n.folderName(n.folderID)
 	}
 	header := lipgloss.JoinHorizontal(lipgloss.Top,
 		styles.ChipPrimary.Render(folderLabel),
 		"  ",
-		styles.MutedText.Render("press f to cycle  X to clear  F to manage folders"),
+		styles.MutedText.Render("esc to return to folders"),
 	)
 	errLine := ""
 	if n.err != nil {
 		errLine = styles.DangerText.Render("error: " + n.err.Error())
 	}
-	n.tbl.SetColumns(noteCols(n.width - 6))
+	n.tbl.SetColumns(components.WithStripeColumn(noteCols(n.width - 6)))
 	if n.height-10 > 0 {
 		n.tbl.SetHeight(n.height - 10)
 	}
@@ -566,8 +549,6 @@ func (n *Notes) View() string {
 		styles.KeyHint("n", "new"),
 		styles.KeyHint("e", "edit"),
 		styles.KeyHint("d", "delete"),
-		styles.KeyHint("f", "filter"),
-		styles.KeyHint("F", "folders"),
 	}
 	body := components.FrameTable("Notes", len(n.view), n.tbl, hints, true)
 	parts := []string{header, ""}
@@ -607,7 +588,7 @@ func (n *Notes) detailView() string {
 
 func (n *Notes) folderListView() string {
 	header := components.Crumbs("Notes", "Folders")
-	n.folderTbl.SetColumns(folderCols(n.width - 6))
+	n.folderTbl.SetColumns(components.WithStripeColumn(folderCols(n.width - 6)))
 	if n.height-8 > 0 {
 		n.folderTbl.SetHeight(n.height - 8)
 	}
@@ -628,8 +609,6 @@ func (n *Notes) StatusHints() []string {
 		styles.KeyHint("n", "new"),
 		styles.KeyHint("e", "edit"),
 		styles.KeyHint("d", "delete"),
-		styles.KeyHint("f", "filter folder"),
-		styles.KeyHint("F", "folders"),
 	}
 }
 func (n *Notes) Help() []components.HelpEntry {
@@ -648,8 +627,8 @@ func (n *Notes) Help() []components.HelpEntry {
 }
 func (n *Notes) SetSize(w, h int) {
 	n.width, n.height = w, h
-	n.tbl.SetColumns(noteCols(w - 6))
-	n.folderTbl.SetColumns(folderCols(w - 6))
+	n.tbl.SetColumns(components.WithStripeColumn(noteCols(w - 6)))
+	n.folderTbl.SetColumns(components.WithStripeColumn(folderCols(w - 6)))
 	if h-8 > 0 {
 		n.tbl.SetHeight(h - 8)
 		n.folderTbl.SetHeight(h - 8)
@@ -658,3 +637,42 @@ func (n *Notes) SetSize(w, h int) {
 
 // IsTextEditing reports that a form/textarea is active.
 func (n *Notes) IsTextEditing() bool { return n.mode == noteForm || n.mode == noteFolderForm }
+
+// OnEscape pops one mode level. Returns false at the list (top).
+func (n *Notes) OnEscape() bool {
+	switch n.mode {
+	case noteDetail, noteConfirmDelete:
+		n.mode = noteList
+		return true
+	case noteList:
+		// Back up from filtered notes list to the folder browser.
+		n.folderID = ""
+		n.refilter()
+		n.mode = noteFolderList
+		return true
+	case noteConfirmDeleteFolder:
+		n.mode = noteFolderList
+		return true
+	case noteForm:
+		n.mode = noteList
+		n.form = nil
+		return true
+	case noteFolderForm:
+		n.mode = noteFolderList
+		n.folderForm = nil
+		return true
+	}
+	// noteFolderList is the top — return false so App returns to sidebar.
+	return false
+}
+
+func (n *Notes) PaletteCommands() []components.Command {
+	return []components.Command{
+		{Name: "all-notes", Display: "Show all notes (skip folder filter)", Group: "Notes", Run: func() tea.Cmd {
+			n.folderID = ""
+			n.refilter()
+			n.mode = noteList
+			return nil
+		}},
+	}
+}

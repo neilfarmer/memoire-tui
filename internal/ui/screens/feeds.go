@@ -3,7 +3,6 @@ package screens
 import (
 	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -41,8 +40,8 @@ type Feeds struct {
 
 	feeds       []api.Feed
 	articles    []api.Article
-	feedsTbl    table.Model
-	articlesTbl table.Model
+	feedsTbl    components.Model
+	articlesTbl components.Model
 
 	currentArticle api.Article
 	articleText    string
@@ -162,7 +161,7 @@ func (f *Feeds) refreshRows() {
 		}
 		frows = append(frows, components.Row{truncate(title, 28)})
 	}
-	f.feedsTbl.SetRows(frows)
+	f.feedsTbl.SetRows(components.Stripe(frows, feedTblCols()))
 	arows := make([]components.Row, 0, len(f.articles))
 	for _, a := range f.articles {
 		mark := " "
@@ -173,7 +172,7 @@ func (f *Feeds) refreshRows() {
 			mark, truncate(a.PubDate, 12), truncate(a.SourceFeed, 18), a.Title,
 		})
 	}
-	f.articlesTbl.SetRows(arows)
+	f.articlesTbl.SetRows(components.Stripe(arows, articleTblCols(f.width-32)))
 }
 
 func (f *Feeds) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -188,7 +187,7 @@ func (f *Feeds) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return f, nil
 	case feedsDetail:
 		switch m.String() {
-		case "esc", "q":
+		case "esc":
 			f.mode = feedsList
 		case "o":
 			return f, components.OpenURL(articleURL(f.currentArticle))
@@ -232,12 +231,6 @@ func (f *Feeds) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "r", "ctrl+r":
 		return f, f.refresh()
-	case "F":
-		c := f.client
-		return f, func() tea.Msg {
-			arts, err := c.ListFeedArticles(true)
-			return feedsLoadedMsg{articles: arts, err: err, feeds: f.feeds}
-		}
 	}
 	var cmd tea.Cmd
 	if f.pane == feedsPaneFeeds {
@@ -259,7 +252,7 @@ func (f *Feeds) startAdd() tea.Cmd {
 	f.addURL = ""
 	f.addForm = huh.NewForm(huh.NewGroup(
 		huh.NewInput().Title("Feed URL").Value(&f.addURL).Validate(notEmpty),
-	))
+	)).WithKeyMap(components.FormKeyMap())
 	f.mode = feedsAddForm
 	return f.addForm.Init()
 }
@@ -330,7 +323,7 @@ func (f *Feeds) View() string {
 		f.feedsTbl.SetHeight(f.height - 6)
 		f.articlesTbl.SetHeight(f.height - 6)
 	}
-	f.articlesTbl.SetColumns(articleTblCols(rightWidth))
+	f.articlesTbl.SetColumns(components.WithStripeColumn(articleTblCols(rightWidth)))
 	feedsHints := []string{
 		styles.KeyHint("tab", "switch"),
 		styles.KeyHint("n", "add"),
@@ -390,3 +383,28 @@ func (f *Feeds) Help() []components.HelpEntry {
 	}
 }
 func (f *Feeds) SetSize(w, h int) { f.width, f.height = w, h }
+
+func (f *Feeds) OnEscape() bool {
+	switch f.mode {
+	case feedsDetail, feedsConfirmDeleteFeed:
+		f.mode = feedsList
+		return true
+	case feedsAddForm:
+		f.mode = feedsList
+		f.addForm = nil
+		return true
+	}
+	return false
+}
+
+func (f *Feeds) PaletteCommands() []components.Command {
+	return []components.Command{
+		{Name: "force-refresh", Display: "Force refresh articles", Group: "Feeds", Run: func() tea.Cmd {
+			c := f.client
+			return func() tea.Msg {
+				arts, err := c.ListFeedArticles(true)
+				return feedsLoadedMsg{articles: arts, err: err, feeds: f.feeds}
+			}
+		}},
+	}
+}

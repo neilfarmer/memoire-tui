@@ -15,8 +15,7 @@ and disables create/delete in that case).
 | Habits | `screens/habits.go` | `GET/POST/PUT/DELETE /habits{,/id}`, `POST /habits/{id}/toggle?date=` | 30-day ASCII history, current/best streak |
 | Journal | `screens/journal.go` | `GET /journal?q=`, `GET/PUT/DELETE /journal/{date}` | Month calendar with markers, mood pills, `$EDITOR` for body |
 | Goals | `screens/goals.go` | `GET/POST/PUT/DELETE /goals{,/id}` | Status filter, progress bar |
-| Health | `screens/health.go` | `GET /health`, `GET/PUT/DELETE /health/{date}`, `GET /health/summary?days=`, `GET /health/exercises/recent?q&days&limit`, `GET /health/history?days=` | Trends summary replaces sparkline charts |
-| Nutrition | `screens/nutrition.go` | `GET /nutrition`, `GET/PUT/DELETE /nutrition/{date}`, `GET /nutrition/summary`, `GET /nutrition/meals/recent` | Day-keyed meal log, totals row |
+| Health | `screens/health.go` | `GET /health`, `GET/PUT/DELETE /health/{date}`, `GET /health/summary?days=`, `GET /health/exercises/recent?q&days&limit`, `GET /health/history?days=` | `:trends` palette command for 7-day summary; foods + exercises both tracked here. |
 | Finances | `screens/finances.go` | `/debts`, `/income`, `/fixed-expenses` (full CRUD each), `GET /finances/summary` | Three tabs + summary header |
 | Feeds | `screens/feeds.go` | `GET/POST/DELETE /feeds{,/id}`, `GET /feeds/articles?force=`, `GET /feeds/article-text?url=`, `POST /feeds/read`, `POST /favorites` (heart) | Two-pane reader, inline article via glamour |
 | Bookmarks | `screens/bookmarks.go` | `GET/POST/PUT/DELETE /bookmarks{,/id}` (with `q` and `tag`) | Built-in `/` filter, browser open |
@@ -27,13 +26,12 @@ and disables create/delete in that case).
 | Admin | `screens/admin.go` | `GET /home/costs`, `GET /admin/stats` | Read-only; failures render "(unavailable)" |
 | Dashboard | `screens/dashboard.go` | `GET /tasks`, `GET /habits`, `GET /notes` | Today / streak / latest snapshot |
 
-## Diagrams omission
+## Excluded features
 
-Diagrams (canvas drawing) is intentionally absent. The terminal cannot render
-the SPA's editing surface and the user explicitly opted to drop the screen
-rather than ship a JSON-only adaptation. The endpoints (`/diagrams`,
-`/diagrams/{id}`) remain reachable from the API client surface only via the
-shared `*api.Client` helpers; no typed wrappers are exposed.
+- **Diagrams** — canvas drawing. Terminal cannot render the SPA's editing
+  surface; no typed wrappers in `internal/api/`.
+- **Nutrition** — the memoire backend has no `/nutrition` endpoint. Nutrition
+  data lives under `/health/{date}` foods, surfaced by the Health screen.
 
 ## Auth headers
 

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -34,7 +33,7 @@ type Tokens struct {
 
 	patForbidden bool
 	tokens       []api.Token
-	tbl          table.Model
+	tbl          components.Model
 
 	form          *huh.Form
 	formName      string
@@ -131,7 +130,7 @@ func (t *Tokens) refreshRows() {
 	for _, x := range t.tokens {
 		rows = append(rows, components.Row{x.Name, orDash(x.CreatedAt), orDash(x.LastUsedAt)})
 	}
-	t.tbl.SetRows(rows)
+	t.tbl.SetRows(components.Stripe(rows, tokenCols(t.width-6)))
 }
 
 func (t *Tokens) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -190,7 +189,7 @@ func (t *Tokens) startNew() tea.Cmd {
 	t.formName = ""
 	t.form = huh.NewForm(huh.NewGroup(
 		huh.NewInput().Title("Token name").Value(&t.formName).Validate(notEmpty),
-	))
+	)).WithKeyMap(components.FormKeyMap())
 	t.mode = tokenForm
 	return t.form.Init()
 }
@@ -238,7 +237,7 @@ func (t *Tokens) View() string {
 		}
 		return styles.Box.Render(strings.Join(rows, "\n"))
 	}
-	t.tbl.SetColumns(tokenCols(t.width - 6))
+	t.tbl.SetColumns(components.WithStripeColumn(tokenCols(t.width - 6)))
 	if t.height-6 > 0 {
 		t.tbl.SetHeight(t.height - 6)
 	}
@@ -285,3 +284,17 @@ func (t *Tokens) SetSize(w, h int) { t.width, t.height = w, h }
 
 // IsTextEditing reports that a form is active.
 func (t *Tokens) IsTextEditing() bool { return t.mode == tokenForm }
+
+func (t *Tokens) OnEscape() bool {
+	switch t.mode {
+	case tokenForm:
+		t.mode = tokenView
+		t.form = nil
+		return true
+	case tokenConfirmDelete, tokenShowSecret:
+		t.mode = tokenView
+		t.createdSecret = ""
+		return true
+	}
+	return false
+}

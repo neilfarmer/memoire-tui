@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -34,7 +33,7 @@ type Goals struct {
 	goals   []api.Goal
 	view    []api.Goal
 	filter  string
-	tbl     table.Model
+	tbl     components.Model
 	form    *huh.Form
 	formIn  goalFormState
 }
@@ -130,7 +129,7 @@ func (g *Goals) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return g, nil
 	case goalDetail:
 		switch m.String() {
-		case "esc", "q":
+		case "esc":
 			g.mode = goalList
 		case "e":
 			return g, g.startEdit()
@@ -215,7 +214,7 @@ func (g *Goals) refilter() {
 			x.Title,
 		})
 	}
-	g.tbl.SetRows(rows)
+	g.tbl.SetRows(components.Stripe(rows, goalCols(g.width-6)))
 }
 
 func (g *Goals) startNew() tea.Cmd {
@@ -262,7 +261,7 @@ func (g *Goals) newForm() *huh.Form {
 		).Value(&d.status),
 		huh.NewInput().Title("Deadline (YYYY-MM-DD)").Value(&d.deadline).Validate(validateOptionalDate),
 		huh.NewInput().Title("Progress (0-100)").Value(&d.progress),
-	))
+	)).WithKeyMap(components.FormKeyMap())
 }
 
 func (g *Goals) submit() tea.Cmd {
@@ -317,7 +316,7 @@ func (g *Goals) View() string {
 		return styles.MutedText.Render("Loading goals...")
 	}
 	header := renderPills(g.filter, []string{"all", "active", "completed", "abandoned"})
-	g.tbl.SetColumns(goalCols(g.width - 6))
+	g.tbl.SetColumns(components.WithStripeColumn(goalCols(g.width - 6)))
 	if g.height-8 > 0 {
 		g.tbl.SetHeight(g.height - 8)
 	}
@@ -384,7 +383,7 @@ func (g *Goals) Help() []components.HelpEntry {
 }
 func (g *Goals) SetSize(w, h int) {
 	g.width, g.height = w, h
-	g.tbl.SetColumns(goalCols(w - 6))
+	g.tbl.SetColumns(components.WithStripeColumn(goalCols(w - 6)))
 	if h-8 > 0 {
 		g.tbl.SetHeight(h - 8)
 	}
@@ -392,3 +391,16 @@ func (g *Goals) SetSize(w, h int) {
 
 // IsTextEditing reports that a form is active.
 func (g *Goals) IsTextEditing() bool { return g.mode == goalForm }
+
+func (g *Goals) OnEscape() bool {
+	switch g.mode {
+	case goalDetail, goalConfirmDelete:
+		g.mode = goalList
+		return true
+	case goalForm:
+		g.mode = goalList
+		g.form = nil
+		return true
+	}
+	return false
+}

@@ -27,21 +27,21 @@ func TestAppRendersAfterResize(t *testing.T) {
 	}
 }
 
-func TestCtrlNNextScreen(t *testing.T) {
+func TestArrowDownCyclesScreens(t *testing.T) {
 	client := api.New("https://example.com", "pat_test")
 	app := New(client, DefaultFactories(client))
 	_ = app.Init()
 	app.Update(tea.WindowSizeMsg{Width: 100, Height: 40})
-	// ctrl+n cycles to next screen (Dashboard -> Tasks).
-	model, _ := app.Update(tea.KeyMsg{Type: tea.KeyCtrlN})
+	// Sidebar focused at boot. Down arrow moves to Tasks (preview-activate).
+	model, _ := app.Update(tea.KeyMsg{Type: tea.KeyDown})
 	a := model.(*App)
 	if a.current != ScreenTasks {
-		t.Errorf("expected current=tasks after ctrl+n, got %s", a.current)
+		t.Errorf("expected current=tasks after ↓, got %s", a.current)
 	}
-	model, _ = a.Update(tea.KeyMsg{Type: tea.KeyCtrlP})
+	model, _ = a.Update(tea.KeyMsg{Type: tea.KeyUp})
 	a = model.(*App)
 	if a.current != ScreenDashboard {
-		t.Errorf("expected current=dashboard after ctrl+p, got %s", a.current)
+		t.Errorf("expected current=dashboard after ↑, got %s", a.current)
 	}
 }
 

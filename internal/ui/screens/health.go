@@ -162,9 +162,6 @@ func (h *Health) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return h, h.startEdit()
 	case "d":
 		h.mode = healthConfirmDelete
-	case "T":
-		h.mode = healthSummary
-		return h, h.loadSummary()
 	case "r", "ctrl+r":
 		return h, h.loadDay()
 	}
@@ -189,7 +186,7 @@ func (h *Health) startEdit() tea.Cmd {
 		huh.NewInput().Title("Calories burned").Value(&d.caloriesOut),
 		huh.NewInput().Title("Weight").Value(&d.weight),
 		huh.NewText().Title("Notes").Value(&d.notes).Lines(3),
-	))
+	)).WithKeyMap(components.FormKeyMap())
 	h.mode = healthForm
 	return h.form.Init()
 }
@@ -338,3 +335,22 @@ func (h *Health) SetSize(w, ht int) { h.width, h.height = w, ht }
 
 // IsTextEditing reports that a form is active.
 func (h *Health) IsTextEditing() bool { return h.mode == healthForm }
+
+func (h *Health) OnEscape() bool {
+	switch h.mode {
+	case healthForm:
+		h.mode = healthView
+		h.form = nil
+		return true
+	case healthSummary, healthConfirmDelete:
+		h.mode = healthView
+		return true
+	}
+	return false
+}
+
+func (h *Health) PaletteCommands() []components.Command {
+	return []components.Command{
+		{Name: "trends", Display: "Trends (7-day summary)", Group: "Health", Run: func() tea.Cmd { h.mode = healthSummary; return h.loadSummary() }},
+	}
+}

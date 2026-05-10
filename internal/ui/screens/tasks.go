@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -39,7 +38,7 @@ type Tasks struct {
 	filtered []api.Task
 	filter   string
 	sortMode string
-	tbl      table.Model
+	tbl      components.Model
 
 	form     *huh.Form
 	formData taskFormState
@@ -141,7 +140,7 @@ func (t *Tasks) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return t, nil
 	case taskDetail:
 		switch m.String() {
-		case "esc", "q":
+		case "esc":
 			t.mode = taskList
 		case "e":
 			return t, t.startEdit()
@@ -167,7 +166,7 @@ func (t *Tasks) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return t, cmd
 	case taskCalendar:
-		if m.String() == "esc" || m.String() == "c" {
+		if m.String() == "esc" {
 			t.mode = taskList
 		}
 		return t, nil
@@ -189,10 +188,6 @@ func (t *Tasks) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "r", "ctrl+r":
 		t.loading = true
 		return t, t.refresh()
-	case "a":
-		return t, t.autoSchedule()
-	case "c":
-		t.mode = taskCalendar
 	case "f":
 		t.filter = nextFilter(t.filter)
 		t.refilter()
@@ -271,7 +266,7 @@ func (t *Tasks) refilter() {
 			truncate(strings.Join(x.Tags, ","), 14),
 		})
 	}
-	t.tbl.SetRows(rows)
+	t.tbl.SetRows(components.Stripe(rows, taskCols(t.width-6)))
 }
 
 func smartLess(a, b api.Task) bool {
@@ -361,7 +356,7 @@ func (t *Tasks) newForm(title string) *huh.Form {
 			huh.NewInput().Title("Scheduled start (RFC3339, optional)").Value(&d.scheduled),
 			huh.NewInput().Title("Duration minutes (optional)").Value(&d.duration),
 		),
-	).WithTheme(huh.ThemeBase())
+	).WithTheme(huh.ThemeBase()).WithKeyMap(components.FormKeyMap())
 }
 
 func validateOptionalDate(s string) error {
@@ -471,7 +466,7 @@ func (t *Tasks) View() string {
 		tableHeight = 5
 	}
 	t.tbl.SetHeight(tableHeight)
-	t.tbl.SetColumns(taskCols(t.width - 6))
+	t.tbl.SetColumns(components.WithStripeColumn(taskCols(t.width - 6)))
 	hints := []string{
 		styles.KeyHint("↵", "details"),
 		styles.KeyHint("n", "new"),
@@ -579,7 +574,7 @@ func (t *Tasks) Help() []components.HelpEntry {
 }
 func (t *Tasks) SetSize(w, h int) {
 	t.width, t.height = w, h
-	t.tbl.SetColumns(taskCols(w - 6))
+	t.tbl.SetColumns(components.WithStripeColumn(taskCols(w - 6)))
 	if h-8 > 0 {
 		t.tbl.SetHeight(h - 8)
 	}
@@ -587,3 +582,28 @@ func (t *Tasks) SetSize(w, h int) {
 
 // IsTextEditing reports that a form/textarea is active.
 func (t *Tasks) IsTextEditing() bool { return t.mode == taskForm }
+
+// OnEscape pops the screen one level. Returns true if it consumed the esc;
+// false means we are at the list (top) and the App should treat esc as
+// quit-confirm.
+func (t *Tasks) OnEscape() bool {
+	switch t.mode {
+	case taskDetail, taskCalendar, taskConfirmDelete:
+		t.mode = taskList
+		return true
+	case taskForm:
+		t.mode = taskList
+		t.form = nil
+		return true
+	}
+	return false
+}
+
+// PaletteCommands exposes Tasks-only heavy actions to the global command
+// palette.
+func (t *Tasks) PaletteCommands() []components.Command {
+	return []components.Command{
+		{Name: "auto-schedule", Display: "Auto-schedule unscheduled tasks", Group: "Tasks", Hint: "fills time blocks", Run: func() tea.Cmd { return t.autoSchedule() }},
+		{Name: "agenda", Display: "Agenda for next 7 days", Group: "Tasks", Run: func() tea.Cmd { t.mode = taskCalendar; return nil }},
+	}
+}

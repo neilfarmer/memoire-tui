@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -33,7 +32,7 @@ type Bookmarks struct {
 	err     error
 
 	items  []api.Bookmark
-	tbl    table.Model
+	tbl    components.Model
 	tag    string
 	form   *huh.Form
 	formIn bookmarkFormState
@@ -130,7 +129,7 @@ func (b *Bookmarks) refreshRows() {
 			truncate(strings.Join(x.Tags, ","), 22),
 		})
 	}
-	b.tbl.SetRows(rows)
+	b.tbl.SetRows(components.Stripe(rows, bookmarkCols(b.width-6)))
 }
 
 func (b *Bookmarks) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -145,7 +144,7 @@ func (b *Bookmarks) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return b, nil
 	case bookmarkDetail:
 		switch m.String() {
-		case "esc", "q":
+		case "esc":
 			b.mode = bookmarkList
 		case "e":
 			return b, b.startEdit()
@@ -242,7 +241,7 @@ func (b *Bookmarks) newForm() *huh.Form {
 		huh.NewInput().Title("Title").Value(&d.title),
 		huh.NewInput().Title("Tags (comma separated)").Value(&d.tags),
 		huh.NewText().Title("Note").Value(&d.note).Lines(3),
-	))
+	)).WithKeyMap(components.FormKeyMap())
 }
 
 func (b *Bookmarks) submit() tea.Cmd {
@@ -290,7 +289,7 @@ func (b *Bookmarks) View() string {
 	if b.loading && len(b.items) == 0 {
 		return styles.MutedText.Render("Loading bookmarks...")
 	}
-	b.tbl.SetColumns(bookmarkCols(b.width - 6))
+	b.tbl.SetColumns(components.WithStripeColumn(bookmarkCols(b.width - 6)))
 	if b.height-6 > 0 {
 		b.tbl.SetHeight(b.height - 6)
 	}
@@ -350,7 +349,7 @@ func (b *Bookmarks) Help() []components.HelpEntry {
 }
 func (b *Bookmarks) SetSize(w, h int) {
 	b.width, b.height = w, h
-	b.tbl.SetColumns(bookmarkCols(w - 6))
+	b.tbl.SetColumns(components.WithStripeColumn(bookmarkCols(w - 6)))
 	if h-6 > 0 {
 		b.tbl.SetHeight(h - 6)
 	}
@@ -358,3 +357,16 @@ func (b *Bookmarks) SetSize(w, h int) {
 
 // IsTextEditing reports that a form is active.
 func (b *Bookmarks) IsTextEditing() bool { return b.mode == bookmarkForm }
+
+func (b *Bookmarks) OnEscape() bool {
+	switch b.mode {
+	case bookmarkDetail, bookmarkConfirmDelete:
+		b.mode = bookmarkList
+		return true
+	case bookmarkForm:
+		b.mode = bookmarkList
+		b.form = nil
+		return true
+	}
+	return false
+}

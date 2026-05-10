@@ -3,7 +3,6 @@ package screens
 import (
 	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -20,7 +19,7 @@ type Favorites struct {
 	loading bool
 	err     error
 	items   []api.Favorite
-	tbl     table.Model
+	tbl     components.Model
 	confirm bool
 }
 
@@ -95,7 +94,7 @@ func (f *Favorites) refreshRows() {
 			truncate(strings.Join(x.Tags, ","), 22),
 		})
 	}
-	f.tbl.SetRows(rows)
+	f.tbl.SetRows(components.Stripe(rows, favoriteCols(f.width-6)))
 }
 
 func (f *Favorites) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -150,7 +149,7 @@ func (f *Favorites) View() string {
 	if f.loading && len(f.items) == 0 {
 		return styles.MutedText.Render("Loading favorites...")
 	}
-	f.tbl.SetColumns(favoriteCols(f.width - 6))
+	f.tbl.SetColumns(components.WithStripeColumn(favoriteCols(f.width - 6)))
 	if f.height-6 > 0 {
 		f.tbl.SetHeight(f.height - 6)
 	}
@@ -179,8 +178,17 @@ func (f *Favorites) Help() []components.HelpEntry {
 }
 func (f *Favorites) SetSize(w, h int) {
 	f.width, f.height = w, h
-	f.tbl.SetColumns(favoriteCols(w - 6))
+	f.tbl.SetColumns(components.WithStripeColumn(favoriteCols(w - 6)))
 	if h-6 > 0 {
 		f.tbl.SetHeight(h - 6)
 	}
+}
+
+// Favorites has no sub-modes beyond a delete confirm.
+func (f *Favorites) OnEscape() bool {
+	if f.confirm {
+		f.confirm = false
+		return true
+	}
+	return false
 }
