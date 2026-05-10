@@ -54,7 +54,7 @@ func TestEndToEnd_TasksLoadsAndShowsRow(t *testing.T) {
 		return strings.Contains(string(out), "Dashboard")
 	}, teatest.WithCheckInterval(time.Millisecond*50), teatest.WithDuration(2*time.Second))
 
-	tm.Send(tea.KeyMsg{Type: tea.KeyCtrlN})
+	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 
 	teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
 		return strings.Contains(string(out), "Real task")
@@ -74,15 +74,16 @@ func TestEndToEnd_NotesEditOpensForm(t *testing.T) {
 
 	tm := teatest.NewTestModel(t, app, teatest.WithInitialTermSize(120, 40))
 
-	// Jump to notes: ctrl+n twice from dashboard.
-	tm.Send(tea.KeyMsg{Type: tea.KeyCtrlN})
-	tm.Send(tea.KeyMsg{Type: tea.KeyCtrlN})
+	// Sidebar is focused at boot. Down twice puts cursor on Notes.
+	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 
 	teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
 		return strings.Contains(string(out), "Real note")
 	}, teatest.WithCheckInterval(time.Millisecond*50), teatest.WithDuration(2*time.Second))
 
-	// Press 'e' on the list. Expect form to open with title field.
+	// Enter drills into content; then press 'e' on the list.
+	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 	tm.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
 
 	teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
@@ -142,19 +143,30 @@ func TestEscDrillsUpThenQuits(t *testing.T) {
 	app.activate(ScreenTasks)
 	app.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 
-	// Press 'n' to open the new-task form (works without loaded data).
+	// Drill into content (Tasks list).
+	app.sideFocus = false
+	// Press 'n' to open the new-task form.
 	app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
 
-	// First esc drops the form; should NOT open quit confirm.
+	// First esc closes the form. Should NOT open quit confirm.
 	app.Update(tea.KeyMsg{Type: tea.KeyEscape})
 	if app.quitConfirm {
 		t.Fatalf("first esc should drill up, not open quit confirm")
 	}
 
-	// Second esc at the list level opens the quit confirm.
+	// Second esc returns focus to sidebar. Still no quit confirm.
+	app.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	if app.quitConfirm {
+		t.Fatalf("second esc should return to sidebar, not quit confirm")
+	}
+	if !app.sideFocus {
+		t.Fatalf("second esc should restore sidebar focus")
+	}
+
+	// Third esc on sidebar opens the quit confirm.
 	app.Update(tea.KeyMsg{Type: tea.KeyEscape})
 	if !app.quitConfirm {
-		t.Errorf("esc at top level should open quit confirm")
+		t.Errorf("esc at sidebar should open quit confirm")
 	}
 
 	// Pressing 'n' inside the quit confirm cancels it.

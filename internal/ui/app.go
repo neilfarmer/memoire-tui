@@ -24,7 +24,8 @@ type App struct {
 	apiHost     string
 	keys        GlobalKeys
 	current     Screen
-	sideCursor  int // index into SidebarOrder; tracks current screen for sidebar render
+	sideCursor  int  // index into SidebarOrder; tracks current screen for sidebar render
+	sideFocus   bool // true = arrows nav sidebar; false = arrows nav content
 	registry    map[Screen]screens.Screen
 	factories   map[Screen]ScreenFactory
 	width       int
@@ -52,6 +53,7 @@ func New(client *api.Client, factories map[Screen]ScreenFactory) *App {
 		keys:       DefaultKeys(),
 		current:    ScreenDashboard,
 		sideCursor: 0,
+		sideFocus:  true,
 		registry:   map[Screen]screens.Screen{},
 		factories:  factories,
 		connected:  true,
@@ -156,21 +158,22 @@ func (a *App) handleKey(m tea.KeyMsg) (tea.Cmd, bool) {
 	if key.Matches(m, a.keys.Quit) {
 		return tea.Quit, true
 	}
-	// Global cycle screens from anywhere. Plain ↑/↓ navigate the sidebar
-	// screen list — that's the primary nav. Use j/k inside tables for cursor
-	// movement (bubbles/table accepts both). ctrl+↑/↓ kept for muscle-memory.
-	if !a.currentScreenIsEditing() {
+	// Sidebar focus: arrows nav screens, enter drills into content.
+	if a.sideFocus && !a.currentScreenIsEditing() {
 		switch m.String() {
-		case "down", "ctrl+n", "ctrl+down":
-			if a.sideCursor < len(SidebarOrder)-1 {
-				a.sideCursor++
-			}
-			return a.activate(SidebarOrder[a.sideCursor]), true
-		case "up", "ctrl+p", "ctrl+up":
+		case "up":
 			if a.sideCursor > 0 {
 				a.sideCursor--
 			}
 			return a.activate(SidebarOrder[a.sideCursor]), true
+		case "down":
+			if a.sideCursor < len(SidebarOrder)-1 {
+				a.sideCursor++
+			}
+			return a.activate(SidebarOrder[a.sideCursor]), true
+		case "enter", "right":
+			a.sideFocus = false
+			return nil, true
 		}
 	}
 	// `?` toggles help unless a text input is focused.
@@ -190,20 +193,28 @@ func (a *App) handleKey(m tea.KeyMsg) (tea.Cmd, bool) {
 		a.paletteOpen = true
 		return nil, true
 	}
-	// Esc drill-up: forward to screen first; if screen says it was already
-	// at top level, open quit confirm.
+	// Esc drill-up:
+	//   form / detail → list (screen.OnEscape)
+	//   list (content focused) → sidebar focus
+	//   sidebar focused → quit confirm
 	if m.String() == "esc" {
 		if a.currentScreenIsEditing() {
 			// Forms / chat input handle esc themselves.
 			return nil, false
 		}
-		if cur, ok := a.registry[a.current]; ok {
-			if e, ok := cur.(escapableScreen); ok {
-				if e.OnEscape() {
-					return nil, true
+		if !a.sideFocus {
+			if cur, ok := a.registry[a.current]; ok {
+				if e, ok := cur.(escapableScreen); ok {
+					if e.OnEscape() {
+						return nil, true
+					}
 				}
 			}
+			// Content is at its top level — return focus to sidebar.
+			a.sideFocus = true
+			return nil, true
 		}
+		// Already on sidebar — confirm quit.
 		a.quitConfirm = true
 		return nil, true
 	}
@@ -303,9 +314,10 @@ func (a *App) View() string {
 		})
 	}
 	side := components.Sidebar{
-		Items:  items,
-		Active: string(SidebarOrder[a.sideCursor]),
-		Width:  24,
+		Items:   items,
+		Active:  string(SidebarOrder[a.sideCursor]),
+		Width:   24,
+		Focused: a.sideFocus,
 	}.View()
 
 	var content string
@@ -316,15 +328,25 @@ func (a *App) View() string {
 	// sidebar off-screen.
 	contentBox := lipgloss.NewStyle().Width(a.contentWidth()).Height(a.contentHeight()).MaxHeight(a.contentHeight()).Render(content)
 
-	hints := []string{
-		styles.KeyHint(":", "command"),
-		styles.KeyHint("ctrl+↑↓", "screens"),
-		styles.KeyHint("esc", "back / quit"),
-		styles.KeyHint("?", "help"),
-	}
-	if cur, ok := a.registry[a.current]; ok {
-		extra := cur.StatusHints()
-		hints = append(extra, hints...)
+	var hints []string
+	if a.sideFocus {
+		hints = []string{
+			styles.KeyHint("↑↓", "screens"),
+			styles.KeyHint("↵", "enter screen"),
+			styles.KeyHint(":", "command"),
+			styles.KeyHint("esc", "quit"),
+			styles.KeyHint("?", "help"),
+		}
+	} else {
+		hints = []string{
+			styles.KeyHint(":", "command"),
+			styles.KeyHint("esc", "back"),
+			styles.KeyHint("?", "help"),
+		}
+		if cur, ok := a.registry[a.current]; ok {
+			extra := cur.StatusHints()
+			hints = append(extra, hints...)
+		}
 	}
 	status := components.StatusBar{
 		Screen: SidebarLabels[a.current],
@@ -352,13 +374,11 @@ func (a *App) View() string {
 func (a *App) helpSections() map[string][]components.HelpEntry {
 	out := map[string][]components.HelpEntry{
 		"Global": {
+			{Keys: "↑/↓", Desc: "navigate (sidebar when focused, rows in content)"},
+			{Keys: "↵ enter", Desc: "drill in (sidebar → screen → detail/form)"},
+			{Keys: "esc", Desc: "back one level (quit confirm at sidebar)"},
 			{Keys: ":", Desc: "open command palette"},
 			{Keys: "?", Desc: "toggle help"},
-			{Keys: "esc", Desc: "back one level (quit at top)"},
-			{Keys: "↑/↓", Desc: "move cursor in current view"},
-			{Keys: "↵ enter", Desc: "open detail / drill in"},
-			{Keys: "ctrl+n or ctrl+↓", Desc: "next screen"},
-			{Keys: "ctrl+p or ctrl+↑", Desc: "previous screen"},
 			{Keys: "ctrl+r", Desc: "refresh current screen"},
 			{Keys: "ctrl+q", Desc: "force quit"},
 		},
