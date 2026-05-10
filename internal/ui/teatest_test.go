@@ -78,11 +78,14 @@ func TestEndToEnd_NotesEditOpensForm(t *testing.T) {
 	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 
+	// Wait for the folder browser to render its "All notes" entry.
 	teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
-		return strings.Contains(string(out), "Real note")
+		return strings.Contains(string(out), "All notes")
 	}, teatest.WithCheckInterval(time.Millisecond*50), teatest.WithDuration(2*time.Second))
 
-	// Enter drills into content; then press 'e' on the list.
+	// Enter drills sidebar → content (folder list). Enter again selects
+	// "All notes" and drills into the note list. Then 'e' opens edit.
+	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 	tm.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
 
