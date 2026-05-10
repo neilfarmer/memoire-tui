@@ -267,7 +267,7 @@ func (t *Tasks) refilter() {
 			truncate(strings.Join(x.Tags, ","), 14),
 		})
 	}
-	t.tbl.SetRows(rows)
+	t.tbl.SetRows(components.Stripe(rows))
 }
 
 func smartLess(a, b api.Task) bool {
@@ -467,7 +467,7 @@ func (t *Tasks) View() string {
 		tableHeight = 5
 	}
 	t.tbl.SetHeight(tableHeight)
-	t.tbl.SetColumns(taskCols(t.width - 6))
+	t.tbl.SetColumns(components.WithStripeColumn(taskCols(t.width - 6)))
 	hints := []string{
 		styles.KeyHint("↵", "details"),
 		styles.KeyHint("n", "new"),
@@ -575,7 +575,7 @@ func (t *Tasks) Help() []components.HelpEntry {
 }
 func (t *Tasks) SetSize(w, h int) {
 	t.width, t.height = w, h
-	t.tbl.SetColumns(taskCols(w - 6))
+	t.tbl.SetColumns(components.WithStripeColumn(taskCols(w - 6)))
 	if h-8 > 0 {
 		t.tbl.SetHeight(h - 8)
 	}

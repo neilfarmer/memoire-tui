@@ -357,6 +357,8 @@ func (a *App) View() string {
 
 	body := lipgloss.JoinHorizontal(lipgloss.Top, side, contentBox)
 	out := lipgloss.JoinVertical(lipgloss.Left, header, body, status)
+	// Wrap the entire frame in a primary-colored outer border.
+	out = styles.OuterFrame.Width(a.width - 2).Height(a.height - 2).Render(out)
 
 	if a.helpOpen {
 		return components.HelpView(a.width, a.height, a.helpSections(), a.helpOrder())
@@ -467,7 +469,8 @@ func sidebarIndex(s Screen) int {
 }
 
 func (a *App) contentWidth() int {
-	w := a.width - 26 // sidebar 24 + 2 padding
+	// width - sidebar(24) - padding(2) - outer frame(2)
+	w := a.width - 28
 	if w < 40 {
 		w = 40
 	}
@@ -475,7 +478,8 @@ func (a *App) contentWidth() int {
 }
 
 func (a *App) contentHeight() int {
-	h := a.height - 5 // header (2 lines) + statusbar (2 lines) + spacing
+	// height - header(2) - statusbar(2) - spacing(1) - outer frame(2)
+	h := a.height - 7
 	if h < 10 {
 		h = 10
 	}

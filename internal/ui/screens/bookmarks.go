@@ -130,7 +130,7 @@ func (b *Bookmarks) refreshRows() {
 			truncate(strings.Join(x.Tags, ","), 22),
 		})
 	}
-	b.tbl.SetRows(rows)
+	b.tbl.SetRows(components.Stripe(rows))
 }
 
 func (b *Bookmarks) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -290,7 +290,7 @@ func (b *Bookmarks) View() string {
 	if b.loading && len(b.items) == 0 {
 		return styles.MutedText.Render("Loading bookmarks...")
 	}
-	b.tbl.SetColumns(bookmarkCols(b.width - 6))
+	b.tbl.SetColumns(components.WithStripeColumn(bookmarkCols(b.width - 6)))
 	if b.height-6 > 0 {
 		b.tbl.SetHeight(b.height - 6)
 	}
@@ -350,7 +350,7 @@ func (b *Bookmarks) Help() []components.HelpEntry {
 }
 func (b *Bookmarks) SetSize(w, h int) {
 	b.width, b.height = w, h
-	b.tbl.SetColumns(bookmarkCols(w - 6))
+	b.tbl.SetColumns(components.WithStripeColumn(bookmarkCols(w - 6)))
 	if h-6 > 0 {
 		b.tbl.SetHeight(h - 6)
 	}

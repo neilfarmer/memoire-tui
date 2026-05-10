@@ -215,7 +215,7 @@ func (g *Goals) refilter() {
 			x.Title,
 		})
 	}
-	g.tbl.SetRows(rows)
+	g.tbl.SetRows(components.Stripe(rows))
 }
 
 func (g *Goals) startNew() tea.Cmd {
@@ -317,7 +317,7 @@ func (g *Goals) View() string {
 		return styles.MutedText.Render("Loading goals...")
 	}
 	header := renderPills(g.filter, []string{"all", "active", "completed", "abandoned"})
-	g.tbl.SetColumns(goalCols(g.width - 6))
+	g.tbl.SetColumns(components.WithStripeColumn(goalCols(g.width - 6)))
 	if g.height-8 > 0 {
 		g.tbl.SetHeight(g.height - 8)
 	}
@@ -384,7 +384,7 @@ func (g *Goals) Help() []components.HelpEntry {
 }
 func (g *Goals) SetSize(w, h int) {
 	g.width, g.height = w, h
-	g.tbl.SetColumns(goalCols(w - 6))
+	g.tbl.SetColumns(components.WithStripeColumn(goalCols(w - 6)))
 	if h-8 > 0 {
 		g.tbl.SetHeight(h - 8)
 	}

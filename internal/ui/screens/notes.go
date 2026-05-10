@@ -233,7 +233,7 @@ func (n *Notes) refilter() {
 			shortDate(x.UpdatedAt),
 		})
 	}
-	n.tbl.SetRows(rows)
+	n.tbl.SetRows(components.Stripe(rows))
 	frows := make([]components.Row, 0, len(n.folders)+1)
 	// "All notes" pseudo-folder lets users browse without filtering.
 	frows = append(frows, components.Row{"All notes", fmt.Sprintf("%d", len(n.notes))})
@@ -246,7 +246,7 @@ func (n *Notes) refilter() {
 		}
 		frows = append(frows, components.Row{f.Name, fmt.Sprintf("%d", count)})
 	}
-	n.folderTbl.SetRows(frows)
+	n.folderTbl.SetRows(components.Stripe(frows))
 }
 
 func (n *Notes) folderName(id string) string {
@@ -541,7 +541,7 @@ func (n *Notes) View() string {
 	if n.err != nil {
 		errLine = styles.DangerText.Render("error: " + n.err.Error())
 	}
-	n.tbl.SetColumns(noteCols(n.width - 6))
+	n.tbl.SetColumns(components.WithStripeColumn(noteCols(n.width - 6)))
 	if n.height-10 > 0 {
 		n.tbl.SetHeight(n.height - 10)
 	}
@@ -589,7 +589,7 @@ func (n *Notes) detailView() string {
 
 func (n *Notes) folderListView() string {
 	header := components.Crumbs("Notes", "Folders")
-	n.folderTbl.SetColumns(folderCols(n.width - 6))
+	n.folderTbl.SetColumns(components.WithStripeColumn(folderCols(n.width - 6)))
 	if n.height-8 > 0 {
 		n.folderTbl.SetHeight(n.height - 8)
 	}
@@ -628,8 +628,8 @@ func (n *Notes) Help() []components.HelpEntry {
 }
 func (n *Notes) SetSize(w, h int) {
 	n.width, n.height = w, h
-	n.tbl.SetColumns(noteCols(w - 6))
-	n.folderTbl.SetColumns(folderCols(w - 6))
+	n.tbl.SetColumns(components.WithStripeColumn(noteCols(w - 6)))
+	n.folderTbl.SetColumns(components.WithStripeColumn(folderCols(w - 6)))
 	if h-8 > 0 {
 		n.tbl.SetHeight(h - 8)
 		n.folderTbl.SetHeight(h - 8)

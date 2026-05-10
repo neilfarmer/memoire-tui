@@ -202,7 +202,7 @@ func (f *Finances) refreshRows() {
 			x.Name,
 		})
 	}
-	f.debtsTbl.SetRows(drows)
+	f.debtsTbl.SetRows(components.Stripe(drows))
 	irows := make([]components.Row, 0, len(f.incomes))
 	for _, x := range f.incomes {
 		irows = append(irows, components.Row{
@@ -212,7 +212,7 @@ func (f *Finances) refreshRows() {
 			x.Name,
 		})
 	}
-	f.incomesTbl.SetRows(irows)
+	f.incomesTbl.SetRows(components.Stripe(irows))
 	erows := make([]components.Row, 0, len(f.expenses))
 	for _, x := range f.expenses {
 		erows = append(erows, components.Row{
@@ -223,7 +223,7 @@ func (f *Finances) refreshRows() {
 			x.Name,
 		})
 	}
-	f.expensesTbl.SetRows(erows)
+	f.expensesTbl.SetRows(components.Stripe(erows))
 }
 
 func (f *Finances) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -543,15 +543,15 @@ func (f *Finances) renderTab() string {
 	}
 	switch f.tab {
 	case tabDebts:
-		f.debtsTbl.SetColumns(debtCols(width))
+		f.debtsTbl.SetColumns(components.WithStripeColumn(debtCols(width)))
 		f.debtsTbl.SetHeight(height)
 		return components.FrameTable("Debts", len(f.debts), f.debtsTbl, hints, true)
 	case tabIncome:
-		f.incomesTbl.SetColumns(incomeCols(width))
+		f.incomesTbl.SetColumns(components.WithStripeColumn(incomeCols(width)))
 		f.incomesTbl.SetHeight(height)
 		return components.FrameTable("Income", len(f.incomes), f.incomesTbl, hints, true)
 	case tabExpenses:
-		f.expensesTbl.SetColumns(expenseCols(width))
+		f.expensesTbl.SetColumns(components.WithStripeColumn(expenseCols(width)))
 		f.expensesTbl.SetHeight(height)
 		return components.FrameTable("Fixed expenses", len(f.expenses), f.expensesTbl, hints, true)
 	}
