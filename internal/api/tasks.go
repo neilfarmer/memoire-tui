@@ -15,7 +15,7 @@ type Task struct {
 	Tags            []string `json:"tags,omitempty"`
 	ScheduledStart  string   `json:"scheduled_start,omitempty"`
 	DurationMinutes int      `json:"duration_minutes,omitempty"`
-	Notifications   bool     `json:"notifications,omitempty"`
+	Notifications   any      `json:"notifications,omitempty"`
 	RecurrenceRule  any      `json:"recurrence_rule,omitempty"`
 	CreatedAt       string   `json:"created_at,omitempty"`
 	UpdatedAt       string   `json:"updated_at,omitempty"`
@@ -30,7 +30,7 @@ type TaskInput struct {
 	Tags            []string `json:"tags,omitempty"`
 	ScheduledStart  string   `json:"scheduled_start,omitempty"`
 	DurationMinutes int      `json:"duration_minutes,omitempty"`
-	Notifications   *bool    `json:"notifications,omitempty"`
+	Notifications   any      `json:"notifications,omitempty"`
 	RecurrenceRule  any      `json:"recurrence_rule,omitempty"`
 }
 

@@ -156,18 +156,22 @@ func (a *App) handleKey(m tea.KeyMsg) (tea.Cmd, bool) {
 	if key.Matches(m, a.keys.Quit) {
 		return tea.Quit, true
 	}
-	// Global cycle screens from anywhere.
-	switch m.String() {
-	case "ctrl+n", "ctrl+down":
-		if a.sideCursor < len(SidebarOrder)-1 {
-			a.sideCursor++
+	// Global cycle screens from anywhere. Plain ↑/↓ navigate the sidebar
+	// screen list — that's the primary nav. Use j/k inside tables for cursor
+	// movement (bubbles/table accepts both). ctrl+↑/↓ kept for muscle-memory.
+	if !a.currentScreenIsEditing() {
+		switch m.String() {
+		case "down", "ctrl+n", "ctrl+down":
+			if a.sideCursor < len(SidebarOrder)-1 {
+				a.sideCursor++
+			}
+			return a.activate(SidebarOrder[a.sideCursor]), true
+		case "up", "ctrl+p", "ctrl+up":
+			if a.sideCursor > 0 {
+				a.sideCursor--
+			}
+			return a.activate(SidebarOrder[a.sideCursor]), true
 		}
-		return a.activate(SidebarOrder[a.sideCursor]), true
-	case "ctrl+p", "ctrl+up":
-		if a.sideCursor > 0 {
-			a.sideCursor--
-		}
-		return a.activate(SidebarOrder[a.sideCursor]), true
 	}
 	// `?` toggles help unless a text input is focused.
 	if m.String() == "?" {
