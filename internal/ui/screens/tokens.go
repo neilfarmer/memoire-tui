@@ -285,3 +285,17 @@ func (t *Tokens) SetSize(w, h int) { t.width, t.height = w, h }
 
 // IsTextEditing reports that a form is active.
 func (t *Tokens) IsTextEditing() bool { return t.mode == tokenForm }
+
+func (t *Tokens) OnEscape() bool {
+	switch t.mode {
+	case tokenForm:
+		t.mode = tokenView
+		t.form = nil
+		return true
+	case tokenConfirmDelete, tokenShowSecret:
+		t.mode = tokenView
+		t.createdSecret = ""
+		return true
+	}
+	return false
+}

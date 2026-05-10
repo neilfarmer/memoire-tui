@@ -20,22 +20,24 @@ type ScreenFactory func(client *api.Client) screens.Screen
 
 // App is the root Bubble Tea Model.
 type App struct {
-	client     *api.Client
-	apiHost    string
-	keys       GlobalKeys
-	current    Screen
-	sideCursor int  // index into SidebarOrder; current sidebar selection
-	sideFocus  bool // true = arrow keys move sideCursor, false = sent to screen
-	registry   map[Screen]screens.Screen
-	factories  map[Screen]ScreenFactory
-	width      int
-	height     int
-	flash      string
-	flashLevel FlashLevel
-	flashID    int64
-	helpOpen   bool
-	connected  bool
-	lastConnAt time.Time
+	client      *api.Client
+	apiHost     string
+	keys        GlobalKeys
+	current     Screen
+	sideCursor  int // index into SidebarOrder; tracks current screen for sidebar render
+	registry    map[Screen]screens.Screen
+	factories   map[Screen]ScreenFactory
+	width       int
+	height      int
+	flash       string
+	flashLevel  FlashLevel
+	flashID     int64
+	helpOpen    bool
+	paletteOpen bool
+	palette     *components.CommandPalette
+	quitConfirm bool
+	connected   bool
+	lastConnAt  time.Time
 }
 
 // New builds the root App with the given API client and screen factories.
@@ -50,7 +52,6 @@ func New(client *api.Client, factories map[Screen]ScreenFactory) *App {
 		keys:       DefaultKeys(),
 		current:    ScreenDashboard,
 		sideCursor: 0,
-		sideFocus:  true,
 		registry:   map[Screen]screens.Screen{},
 		factories:  factories,
 		connected:  true,
@@ -92,7 +93,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if isTerminalNoiseKey(m.String()) {
 			return a, nil
 		}
-		logx.Debug("key event", "key", m.String(), "side_focus", a.sideFocus, "screen", string(a.current))
+		logx.Debug("key event", "key", m.String(), "screen", string(a.current))
 		if cmd, handled := a.handleKey(m); handled {
 			return a, cmd
 		}
@@ -122,28 +123,40 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (a *App) handleKey(m tea.KeyMsg) (tea.Cmd, bool) {
+	// Quit-confirm overlay traps everything until dismissed.
+	if a.quitConfirm {
+		switch m.String() {
+		case "y", "enter":
+			return tea.Quit, true
+		case "n", "esc":
+			a.quitConfirm = false
+			return nil, true
+		}
+		return nil, true
+	}
+	// Help overlay traps esc + ?.
 	if a.helpOpen {
 		if m.String() == "?" || m.String() == "esc" {
 			a.helpOpen = false
 			return nil, true
 		}
 	}
-	switch {
-	case key.Matches(m, a.keys.Quit):
-		return tea.Quit, true
-	case m.String() == "?":
-		// Skip the global help toggle when the active screen reports a
-		// text-input is focused. Otherwise the user cannot type "?" inside
-		// the assistant chat, note title, etc.
-		if a.currentScreenIsEditing() {
-			return nil, false
+	// Command palette traps everything; let the palette consume keys until
+	// it emits a command or is closed via esc.
+	if a.paletteOpen && a.palette != nil {
+		cmd, done := a.palette.HandleKey(m)
+		if done {
+			a.paletteOpen = false
+			if cmd != nil {
+				return a.executeCommand(cmd), true
+			}
 		}
-		a.helpOpen = !a.helpOpen
 		return nil, true
 	}
-	// Global next/prev screen shortcuts that work regardless of focus.
-	// These let the user cycle screens from inside any content view without
-	// returning to the sidebar first.
+	if key.Matches(m, a.keys.Quit) {
+		return tea.Quit, true
+	}
+	// Global cycle screens from anywhere.
 	switch m.String() {
 	case "ctrl+n", "ctrl+down":
 		if a.sideCursor < len(SidebarOrder)-1 {
@@ -156,53 +169,48 @@ func (a *App) handleKey(m tea.KeyMsg) (tea.Cmd, bool) {
 		}
 		return a.activate(SidebarOrder[a.sideCursor]), true
 	}
-	// shift+tab always toggles focus (k9s-style). Tab is consumed by huh forms
-	// and by feeds/finances pane switching, so we use shift+tab to avoid the
-	// clash. Must run before the sidebar block.
-	if m.String() == "shift+tab" {
-		a.sideFocus = !a.sideFocus
+	// `?` toggles help unless a text input is focused.
+	if m.String() == "?" {
+		if a.currentScreenIsEditing() {
+			return nil, false
+		}
+		a.helpOpen = !a.helpOpen
 		return nil, true
 	}
-	if a.sideFocus {
-		switch m.String() {
-		case "up", "k":
-			if a.sideCursor > 0 {
-				a.sideCursor--
-			}
-			return a.activate(SidebarOrder[a.sideCursor]), true
-		case "down", "j":
-			if a.sideCursor < len(SidebarOrder)-1 {
-				a.sideCursor++
-			}
-			return a.activate(SidebarOrder[a.sideCursor]), true
-		case "enter", "right", "l":
-			a.sideFocus = false
-			return a.activate(SidebarOrder[a.sideCursor]), true
-		case "esc":
-			a.sideFocus = false
-			return nil, true
+	// `:` opens the command palette unless a text input is focused.
+	if m.String() == ":" {
+		if a.currentScreenIsEditing() {
+			return nil, false
 		}
-		// Any other key (letters, ctrl combos) means user is interacting with
-		// content — drop sidebar focus and let the screen handle it. Without
-		// this the screen receives a keystroke while we still steal arrows,
-		// producing a soft lock when the screen opens a form/textarea/picker.
-		a.sideFocus = false
+		a.palette = components.NewCommandPalette(a.commandList())
+		a.paletteOpen = true
+		return nil, true
 	}
-	// Esc inside content returns focus to sidebar (only when current screen
-	// is at its top-level — screens that consume esc themselves must do so
-	// before this fires; that's handled by the routing below: handleKey is
-	// called before the screen.Update, but we only steal esc if no modal /
-	// drilldown is active, which we approximate by checking whether the
-	// screen wants the key by way of the global flag — for now we steal esc
-	// only when sideFocus is false AND it's at the table level. Screens that
-	// need esc themselves intercept before delegating, so we return false
-	// here so they can handle it. We provide an explicit binding `\` to pop
-	// to sidebar for users who want a one-key way back.
-	if m.String() == "\\" {
-		a.sideFocus = true
+	// Esc drill-up: forward to screen first; if screen says it was already
+	// at top level, open quit confirm.
+	if m.String() == "esc" {
+		if a.currentScreenIsEditing() {
+			// Forms / chat input handle esc themselves.
+			return nil, false
+		}
+		if cur, ok := a.registry[a.current]; ok {
+			if e, ok := cur.(escapableScreen); ok {
+				if e.OnEscape() {
+					return nil, true
+				}
+			}
+		}
+		a.quitConfirm = true
 		return nil, true
 	}
 	return nil, false
+}
+
+// escapableScreen is implemented by screens that have a sub-mode tree
+// (detail / form / overlay). OnEscape pops one level and returns true; if
+// already at the top level, returns false so the App can quit.
+type escapableScreen interface {
+	OnEscape() bool
 }
 
 // textEditing is implemented by screens that have a focused text input
@@ -291,10 +299,9 @@ func (a *App) View() string {
 		})
 	}
 	side := components.Sidebar{
-		Items:   items,
-		Active:  string(SidebarOrder[a.sideCursor]),
-		Width:   24,
-		Focused: a.sideFocus,
+		Items:  items,
+		Active: string(SidebarOrder[a.sideCursor]),
+		Width:  24,
 	}.View()
 
 	var content string
@@ -306,19 +313,12 @@ func (a *App) View() string {
 	contentBox := lipgloss.NewStyle().Width(a.contentWidth()).Height(a.contentHeight()).MaxHeight(a.contentHeight()).Render(content)
 
 	hints := []string{
+		styles.KeyHint(":", "command"),
 		styles.KeyHint("ctrl+↑↓", "screens"),
-		styles.KeyHint("\\", "sidebar"),
+		styles.KeyHint("esc", "back / quit"),
 		styles.KeyHint("?", "help"),
-		styles.KeyHint("ctrl+q", "quit"),
 	}
-	if a.sideFocus {
-		hints = []string{
-			styles.KeyHint("↑↓", "nav"),
-			styles.KeyHint("↵", "focus content"),
-			styles.KeyHint("?", "help"),
-			styles.KeyHint("ctrl+q", "quit"),
-		}
-	} else if cur, ok := a.registry[a.current]; ok {
+	if cur, ok := a.registry[a.current]; ok {
 		extra := cur.StatusHints()
 		hints = append(extra, hints...)
 	}
@@ -335,20 +335,38 @@ func (a *App) View() string {
 	if a.helpOpen {
 		return components.HelpView(a.width, a.height, a.helpSections(), a.helpOrder())
 	}
+	if a.paletteOpen && a.palette != nil {
+		a.palette.SetSize(a.width, a.height)
+		return a.palette.View()
+	}
+	if a.quitConfirm {
+		return components.ConfirmView("Quit memoire?", a.width, a.height)
+	}
 	return out
 }
 
 func (a *App) helpSections() map[string][]components.HelpEntry {
 	out := map[string][]components.HelpEntry{
 		"Global": {
+			{Keys: ":", Desc: "open command palette"},
 			{Keys: "?", Desc: "toggle help"},
-			{Keys: "ctrl+q", Desc: "quit"},
-			{Keys: "↑/↓", Desc: "navigate sidebar (when focused)"},
-			{Keys: "↵ enter or →", Desc: "focus content from sidebar"},
-			{Keys: "shift+tab or \\", Desc: "return to sidebar"},
-			{Keys: "ctrl+n or ctrl+↓", Desc: "next screen (works from anywhere)"},
-			{Keys: "ctrl+p or ctrl+↑", Desc: "previous screen (works from anywhere)"},
+			{Keys: "esc", Desc: "back one level (quit at top)"},
+			{Keys: "↑/↓", Desc: "move cursor in current view"},
+			{Keys: "↵ enter", Desc: "open detail / drill in"},
+			{Keys: "ctrl+n or ctrl+↓", Desc: "next screen"},
+			{Keys: "ctrl+p or ctrl+↑", Desc: "previous screen"},
 			{Keys: "ctrl+r", Desc: "refresh current screen"},
+			{Keys: "ctrl+q", Desc: "force quit"},
+		},
+		"Universal screen actions": {
+			{Keys: "n", Desc: "new entry"},
+			{Keys: "e", Desc: "edit selected"},
+			{Keys: "d", Desc: "delete selected"},
+			{Keys: "o", Desc: "open URL in browser (where applicable)"},
+			{Keys: "/", Desc: "filter list"},
+			{Keys: "f", Desc: "cycle filter pill"},
+			{Keys: "s", Desc: "cycle sort (where applicable)"},
+			{Keys: "r", Desc: "refresh"},
 		},
 	}
 	if cur, ok := a.registry[a.current]; ok {
@@ -360,11 +378,68 @@ func (a *App) helpSections() map[string][]components.HelpEntry {
 }
 
 func (a *App) helpOrder() []string {
-	order := []string{"Global"}
+	order := []string{"Global", "Universal screen actions"}
 	if cur, ok := a.registry[a.current]; ok {
 		order = append(order, cur.Title())
 	}
 	return order
+}
+
+// commandList builds the palette commands available right now: every screen
+// jump plus any per-screen heavy actions exposed via PaletteCommands().
+func (a *App) commandList() []components.Command {
+	cmds := []components.Command{}
+	for _, s := range SidebarOrder {
+		s := s
+		cmds = append(cmds, components.Command{
+			Name:    string(s),
+			Display: SidebarLabels[s],
+			Group:   "Navigate",
+			Hint:    "screen",
+			Run: func() tea.Cmd {
+				a.sideCursor = sidebarIndex(s)
+				return a.activate(s)
+			},
+		})
+	}
+	if cur, ok := a.registry[a.current]; ok {
+		if pc, ok := cur.(paletteContributor); ok {
+			cmds = append(cmds, pc.PaletteCommands()...)
+		}
+	}
+	cmds = append(cmds,
+		components.Command{Name: "help", Display: "Help", Group: "App", Run: func() tea.Cmd { a.helpOpen = true; return nil }},
+		components.Command{Name: "quit", Display: "Quit", Group: "App", Run: func() tea.Cmd { return tea.Quit }},
+		components.Command{Name: "refresh", Display: "Refresh current screen", Group: "App", Run: func() tea.Cmd {
+			if cur, ok := a.registry[a.current]; ok {
+				return cur.Init()
+			}
+			return nil
+		}},
+	)
+	return cmds
+}
+
+// paletteContributor lets a screen add its own heavy actions to the palette.
+type paletteContributor interface {
+	PaletteCommands() []components.Command
+}
+
+// executeCommand runs a palette selection and returns the resulting tea.Cmd.
+func (a *App) executeCommand(c *components.Command) tea.Cmd {
+	if c == nil || c.Run == nil {
+		return nil
+	}
+	return c.Run()
+}
+
+func sidebarIndex(s Screen) int {
+	for i, x := range SidebarOrder {
+		if x == s {
+			return i
+		}
+	}
+	return 0
 }
 
 func (a *App) contentWidth() int {

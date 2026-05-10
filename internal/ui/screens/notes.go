@@ -271,7 +271,7 @@ func (n *Notes) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return n, nil
 	case noteDetail:
 		switch m.String() {
-		case "esc", "q":
+		case "esc":
 			n.mode = noteList
 		case "e":
 			return n, n.startEdit()
@@ -315,7 +315,7 @@ func (n *Notes) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return n, cmd
 	case noteFolderList:
 		switch m.String() {
-		case "esc", "q":
+		case "esc":
 			n.mode = noteList
 		case "n":
 			return n, n.startFolderForm()
@@ -351,13 +351,8 @@ func (n *Notes) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 			n.current = api.Note{NoteID: n.view[idx].NoteID, Title: n.view[idx].Title}
 			n.mode = noteConfirmDelete
 		}
-	case "F":
-		n.mode = noteFolderList
 	case "f":
 		n.cycleFolder()
-	case "X":
-		n.folderID = ""
-		n.refilter()
 	case "r", "ctrl+r":
 		return n, n.refresh()
 	}
@@ -658,3 +653,28 @@ func (n *Notes) SetSize(w, h int) {
 
 // IsTextEditing reports that a form/textarea is active.
 func (n *Notes) IsTextEditing() bool { return n.mode == noteForm || n.mode == noteFolderForm }
+
+// OnEscape pops one mode level. Returns false at the list (top).
+func (n *Notes) OnEscape() bool {
+	switch n.mode {
+	case noteDetail, noteConfirmDelete, noteFolderList, noteConfirmDeleteFolder:
+		n.mode = noteList
+		return true
+	case noteForm:
+		n.mode = noteList
+		n.form = nil
+		return true
+	case noteFolderForm:
+		n.mode = noteFolderList
+		n.folderForm = nil
+		return true
+	}
+	return false
+}
+
+func (n *Notes) PaletteCommands() []components.Command {
+	return []components.Command{
+		{Name: "folders", Display: "Manage folders", Group: "Notes", Run: func() tea.Cmd { n.mode = noteFolderList; return nil }},
+		{Name: "clear-filter", Display: "Clear folder filter", Group: "Notes", Run: func() tea.Cmd { n.folderID = ""; n.refilter(); return nil }},
+	}
+}

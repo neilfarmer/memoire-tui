@@ -141,7 +141,7 @@ func (t *Tasks) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return t, nil
 	case taskDetail:
 		switch m.String() {
-		case "esc", "q":
+		case "esc":
 			t.mode = taskList
 		case "e":
 			return t, t.startEdit()
@@ -167,7 +167,7 @@ func (t *Tasks) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return t, cmd
 	case taskCalendar:
-		if m.String() == "esc" || m.String() == "c" {
+		if m.String() == "esc" {
 			t.mode = taskList
 		}
 		return t, nil
@@ -189,10 +189,6 @@ func (t *Tasks) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "r", "ctrl+r":
 		t.loading = true
 		return t, t.refresh()
-	case "a":
-		return t, t.autoSchedule()
-	case "c":
-		t.mode = taskCalendar
 	case "f":
 		t.filter = nextFilter(t.filter)
 		t.refilter()
@@ -587,3 +583,28 @@ func (t *Tasks) SetSize(w, h int) {
 
 // IsTextEditing reports that a form/textarea is active.
 func (t *Tasks) IsTextEditing() bool { return t.mode == taskForm }
+
+// OnEscape pops the screen one level. Returns true if it consumed the esc;
+// false means we are at the list (top) and the App should treat esc as
+// quit-confirm.
+func (t *Tasks) OnEscape() bool {
+	switch t.mode {
+	case taskDetail, taskCalendar, taskConfirmDelete:
+		t.mode = taskList
+		return true
+	case taskForm:
+		t.mode = taskList
+		t.form = nil
+		return true
+	}
+	return false
+}
+
+// PaletteCommands exposes Tasks-only heavy actions to the global command
+// palette.
+func (t *Tasks) PaletteCommands() []components.Command {
+	return []components.Command{
+		{Name: "auto-schedule", Display: "Auto-schedule unscheduled tasks", Group: "Tasks", Hint: "fills time blocks", Run: func() tea.Cmd { return t.autoSchedule() }},
+		{Name: "agenda", Display: "Agenda for next 7 days", Group: "Tasks", Run: func() tea.Cmd { t.mode = taskCalendar; return nil }},
+	}
+}

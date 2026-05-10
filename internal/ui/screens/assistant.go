@@ -306,3 +306,17 @@ func (a *Assistant) SetSize(w, h int) { a.width, a.height = w, h }
 // should not steal single-character shortcuts (e.g. "?") that the user is
 // trying to type into the chat input.
 func (a *Assistant) IsTextEditing() bool { return a.pane == assistantPaneInput }
+
+func (a *Assistant) OnEscape() bool {
+	// Assistant is always at top level; the textarea handles its own esc.
+	return false
+}
+
+func (a *Assistant) PaletteCommands() []components.Command {
+	return []components.Command{
+		{Name: "new-conversation", Display: "Start a new conversation", Group: "Assistant", Run: func() tea.Cmd { return a.newConversation() }},
+		{Name: "clear-history", Display: "Clear current conversation", Group: "Assistant", Run: func() tea.Cmd { return a.clearHistory() }},
+		{Name: "model-nova-lite", Display: "Switch model: nova-lite", Group: "Assistant", Run: func() tea.Cmd { a.model = "nova-lite"; return nil }},
+		{Name: "model-nova-pro", Display: "Switch model: nova-pro", Group: "Assistant", Run: func() tea.Cmd { a.model = "nova-pro"; return nil }},
+	}
+}

@@ -130,7 +130,7 @@ func (g *Goals) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return g, nil
 	case goalDetail:
 		switch m.String() {
-		case "esc", "q":
+		case "esc":
 			g.mode = goalList
 		case "e":
 			return g, g.startEdit()
@@ -392,3 +392,16 @@ func (g *Goals) SetSize(w, h int) {
 
 // IsTextEditing reports that a form is active.
 func (g *Goals) IsTextEditing() bool { return g.mode == goalForm }
+
+func (g *Goals) OnEscape() bool {
+	switch g.mode {
+	case goalDetail, goalConfirmDelete:
+		g.mode = goalList
+		return true
+	case goalForm:
+		g.mode = goalList
+		g.form = nil
+		return true
+	}
+	return false
+}

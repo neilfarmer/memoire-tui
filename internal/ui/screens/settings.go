@@ -136,10 +136,6 @@ func (s *Settings) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.String() {
 	case "e":
 		return s, s.startEdit()
-	case "x":
-		return s, s.export()
-	case "T":
-		return s, s.testNotification()
 	case "r", "ctrl+r":
 		return s, s.refresh()
 	}
@@ -318,3 +314,19 @@ func (s *Settings) SetSize(w, h int) { s.width, s.height = w, h }
 
 // IsTextEditing reports that a form is active.
 func (s *Settings) IsTextEditing() bool { return s.mode == settingsEdit }
+
+func (s *Settings) OnEscape() bool {
+	if s.mode == settingsEdit {
+		s.mode = settingsView
+		s.form = nil
+		return true
+	}
+	return false
+}
+
+func (s *Settings) PaletteCommands() []components.Command {
+	return []components.Command{
+		{Name: "export", Display: "Export all data (presigned URL)", Group: "Settings", Run: func() tea.Cmd { return s.export() }},
+		{Name: "test-notify", Display: "Send test ntfy notification", Group: "Settings", Run: func() tea.Cmd { return s.testNotification() }},
+	}
+}

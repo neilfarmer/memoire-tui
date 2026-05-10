@@ -323,3 +323,17 @@ func (h *Habits) SetSize(w, ht int) { h.width, h.height = w, ht }
 
 // IsTextEditing reports that a form is active.
 func (h *Habits) IsTextEditing() bool { return h.mode == habitForm }
+
+// OnEscape: habits has no sub-modes beyond form/confirm — pop them.
+func (h *Habits) OnEscape() bool {
+	switch h.mode {
+	case habitForm:
+		h.mode = habitList
+		h.form = nil
+		return true
+	case habitConfirmDelete:
+		h.mode = habitList
+		return true
+	}
+	return false
+}

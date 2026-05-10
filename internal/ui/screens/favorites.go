@@ -184,3 +184,12 @@ func (f *Favorites) SetSize(w, h int) {
 		f.tbl.SetHeight(h - 6)
 	}
 }
+
+// Favorites has no sub-modes beyond a delete confirm.
+func (f *Favorites) OnEscape() bool {
+	if f.confirm {
+		f.confirm = false
+		return true
+	}
+	return false
+}

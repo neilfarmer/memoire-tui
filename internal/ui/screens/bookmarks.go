@@ -145,7 +145,7 @@ func (b *Bookmarks) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return b, nil
 	case bookmarkDetail:
 		switch m.String() {
-		case "esc", "q":
+		case "esc":
 			b.mode = bookmarkList
 		case "e":
 			return b, b.startEdit()
@@ -358,3 +358,16 @@ func (b *Bookmarks) SetSize(w, h int) {
 
 // IsTextEditing reports that a form is active.
 func (b *Bookmarks) IsTextEditing() bool { return b.mode == bookmarkForm }
+
+func (b *Bookmarks) OnEscape() bool {
+	switch b.mode {
+	case bookmarkDetail, bookmarkConfirmDelete:
+		b.mode = bookmarkList
+		return true
+	case bookmarkForm:
+		b.mode = bookmarkList
+		b.form = nil
+		return true
+	}
+	return false
+}

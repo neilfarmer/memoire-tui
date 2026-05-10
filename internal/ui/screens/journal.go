@@ -322,3 +322,16 @@ func (j *Journal) SetSize(w, h int) { j.width, j.height = w, h }
 
 // IsTextEditing reports that a form is active.
 func (j *Journal) IsTextEditing() bool { return j.mode == journalForm }
+
+func (j *Journal) OnEscape() bool {
+	switch j.mode {
+	case journalForm:
+		j.mode = journalView
+		j.form = nil
+		return true
+	case journalConfirmDelete:
+		j.mode = journalView
+		return true
+	}
+	return false
+}

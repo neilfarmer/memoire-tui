@@ -121,7 +121,6 @@ func TestEndToEnd_QuestionMarkInAssistantDoesNotOpenHelp(t *testing.T) {
 	app := New(client, DefaultFactories(client))
 
 	// Pre-activate the assistant screen so its IsTextEditing reports true.
-	app.sideFocus = false
 	app.sideCursor = 0
 	app.activate(ScreenAssistant)
 	app.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -131,5 +130,55 @@ func TestEndToEnd_QuestionMarkInAssistantDoesNotOpenHelp(t *testing.T) {
 	app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
 	if app.helpOpen {
 		t.Errorf("help overlay should not toggle while assistant input is focused")
+	}
+}
+
+// TestEscDrillsUpThenQuits verifies the new esc semantics: from a sub-mode,
+// esc returns to the list; from the list (top), esc opens the quit confirm.
+func TestEscDrillsUpThenQuits(t *testing.T) {
+	srv := fakeServer(t)
+	client := api.New(srv.URL, "pat_test")
+	app := New(client, DefaultFactories(client))
+	app.activate(ScreenTasks)
+	app.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	// Press 'n' to open the new-task form (works without loaded data).
+	app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+
+	// First esc drops the form; should NOT open quit confirm.
+	app.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	if app.quitConfirm {
+		t.Fatalf("first esc should drill up, not open quit confirm")
+	}
+
+	// Second esc at the list level opens the quit confirm.
+	app.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	if !app.quitConfirm {
+		t.Errorf("esc at top level should open quit confirm")
+	}
+
+	// Pressing 'n' inside the quit confirm cancels it.
+	app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	if app.quitConfirm {
+		t.Errorf("quit confirm should dismiss on 'n'")
+	}
+}
+
+// TestColonOpensPalette verifies ':' opens the command palette overlay.
+func TestColonOpensPalette(t *testing.T) {
+	srv := fakeServer(t)
+	client := api.New(srv.URL, "pat_test")
+	app := New(client, DefaultFactories(client))
+	app.activate(ScreenDashboard)
+	app.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{':'}})
+	if !app.paletteOpen {
+		t.Fatalf("':' should open the command palette")
+	}
+	// Esc closes it.
+	app.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	if app.paletteOpen {
+		t.Errorf("esc inside palette should close it")
 	}
 }

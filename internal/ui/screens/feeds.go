@@ -188,7 +188,7 @@ func (f *Feeds) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return f, nil
 	case feedsDetail:
 		switch m.String() {
-		case "esc", "q":
+		case "esc":
 			f.mode = feedsList
 		case "o":
 			return f, components.OpenURL(articleURL(f.currentArticle))
@@ -232,12 +232,6 @@ func (f *Feeds) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "r", "ctrl+r":
 		return f, f.refresh()
-	case "F":
-		c := f.client
-		return f, func() tea.Msg {
-			arts, err := c.ListFeedArticles(true)
-			return feedsLoadedMsg{articles: arts, err: err, feeds: f.feeds}
-		}
 	}
 	var cmd tea.Cmd
 	if f.pane == feedsPaneFeeds {
@@ -390,3 +384,28 @@ func (f *Feeds) Help() []components.HelpEntry {
 	}
 }
 func (f *Feeds) SetSize(w, h int) { f.width, f.height = w, h }
+
+func (f *Feeds) OnEscape() bool {
+	switch f.mode {
+	case feedsDetail, feedsConfirmDeleteFeed:
+		f.mode = feedsList
+		return true
+	case feedsAddForm:
+		f.mode = feedsList
+		f.addForm = nil
+		return true
+	}
+	return false
+}
+
+func (f *Feeds) PaletteCommands() []components.Command {
+	return []components.Command{
+		{Name: "force-refresh", Display: "Force refresh articles", Group: "Feeds", Run: func() tea.Cmd {
+			c := f.client
+			return func() tea.Msg {
+				arts, err := c.ListFeedArticles(true)
+				return feedsLoadedMsg{articles: arts, err: err, feeds: f.feeds}
+			}
+		}},
+	}
+}

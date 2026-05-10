@@ -581,3 +581,16 @@ func (f *Finances) SetSize(w, h int) { f.width, f.height = w, h }
 
 // IsTextEditing reports that a form is active.
 func (f *Finances) IsTextEditing() bool { return f.mode == financeForm }
+
+func (f *Finances) OnEscape() bool {
+	switch f.mode {
+	case financeForm:
+		f.mode = financeList
+		f.form = nil
+		return true
+	case financeConfirmDelete:
+		f.mode = financeList
+		return true
+	}
+	return false
+}
