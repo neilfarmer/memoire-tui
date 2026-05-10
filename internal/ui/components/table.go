@@ -19,12 +19,10 @@ type Row = striped.Row
 // existing field declarations (`tbl table.Model` becomes `tbl components.Model`).
 type Model = striped.Model
 
-// stripeBgs are the alternating row background colors. Even rows take the
-// first entry, odd rows the second.
-var stripeBgs = []lipgloss.AdaptiveColor{
-	{Light: "#f8fafc", Dark: "#0e1620"},
-	{Light: "#e2e8f0", Dark: "#1a2332"},
-}
+// stripeBg is the background painted on every other row. Even rows are
+// left at terminal default so the alternation is unambiguous regardless of
+// the user's terminal palette.
+var stripeBg = lipgloss.AdaptiveColor{Light: "#e2e8f0", Dark: "#1e2a3a"}
 
 // NewTable returns a styled table.Model with alternating row backgrounds.
 // The forked striped package adds a per-row Styles.RowStyler hook that the
@@ -52,8 +50,12 @@ func NewTable(cols []Column, rows []Row, height int) striped.Model {
 	s.Cell = s.Cell.Foreground(styles.Text)
 	cell := s.Cell
 	s.RowStyler = func(rowIndex int) lipgloss.Style {
-		bg := stripeBgs[rowIndex%len(stripeBgs)]
-		return cell.Background(bg)
+		// Only stripe odd rows. Even rows render with terminal default so
+		// the alternation is visible no matter the user's background color.
+		if rowIndex%2 == 1 {
+			return cell.Background(stripeBg)
+		}
+		return cell
 	}
 	t.SetStyles(s)
 	return t
