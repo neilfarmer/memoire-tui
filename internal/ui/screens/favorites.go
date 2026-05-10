@@ -95,7 +95,7 @@ func (f *Favorites) refreshRows() {
 			truncate(strings.Join(x.Tags, ","), 22),
 		})
 	}
-	f.tbl.SetRows(components.Stripe(rows))
+	f.tbl.SetRows(components.Stripe(rows, favoriteCols(f.width-6)))
 }
 
 func (f *Favorites) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {

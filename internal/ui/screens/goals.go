@@ -215,7 +215,7 @@ func (g *Goals) refilter() {
 			x.Title,
 		})
 	}
-	g.tbl.SetRows(components.Stripe(rows))
+	g.tbl.SetRows(components.Stripe(rows, goalCols(g.width-6)))
 }
 
 func (g *Goals) startNew() tea.Cmd {

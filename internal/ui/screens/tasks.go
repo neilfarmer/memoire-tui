@@ -267,7 +267,7 @@ func (t *Tasks) refilter() {
 			truncate(strings.Join(x.Tags, ","), 14),
 		})
 	}
-	t.tbl.SetRows(components.Stripe(rows))
+	t.tbl.SetRows(components.Stripe(rows, taskCols(t.width-6)))
 }
 
 func smartLess(a, b api.Task) bool {

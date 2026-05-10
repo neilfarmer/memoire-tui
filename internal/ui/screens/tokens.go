@@ -131,7 +131,7 @@ func (t *Tokens) refreshRows() {
 	for _, x := range t.tokens {
 		rows = append(rows, components.Row{x.Name, orDash(x.CreatedAt), orDash(x.LastUsedAt)})
 	}
-	t.tbl.SetRows(components.Stripe(rows))
+	t.tbl.SetRows(components.Stripe(rows, tokenCols(t.width-6)))
 }
 
 func (t *Tokens) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {

@@ -130,7 +130,7 @@ func (b *Bookmarks) refreshRows() {
 			truncate(strings.Join(x.Tags, ","), 22),
 		})
 	}
-	b.tbl.SetRows(components.Stripe(rows))
+	b.tbl.SetRows(components.Stripe(rows, bookmarkCols(b.width-6)))
 }
 
 func (b *Bookmarks) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {

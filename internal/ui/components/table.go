@@ -15,12 +15,10 @@ type Column = table.Column
 // Row wraps table.Row.
 type Row = table.Row
 
-// NewTable returns a styled table.Model. The model is k9s-like: column header
-// row in cyan, alternating row striping, primary-coloured selection.
+// NewTable returns a styled table.Model. Column header row in cyan, primary-
+// coloured selection. Row striping is handled separately by Stripe() — call
+// it on your rows before SetRows.
 func NewTable(cols []Column, rows []Row, height int) table.Model {
-	// Inject a leading "stripe" column. Each row's stripe cell is filled in
-	// by Stripe(rows) before being passed to SetRows.
-	cols = withStripeColumn(cols)
 	t := table.New(
 		table.WithColumns(cols),
 		table.WithRows(rows),
@@ -38,36 +36,42 @@ func NewTable(cols []Column, rows []Row, height int) table.Model {
 		Foreground(lipgloss.AdaptiveColor{Light: "#ffffff", Dark: "#0b0f14"}).
 		Background(styles.Primary).
 		Bold(true)
-	s.Cell = s.Cell.Foreground(styles.Text)
+	// Drop default Padding(0,1) — Stripe() pads each cell itself so the
+	// background color reaches the column edge.
+	s.Cell = lipgloss.NewStyle().Foreground(styles.Text)
 	t.SetStyles(s)
 	return t
 }
 
-// WithStripeColumn prepends an empty column used by Stripe() to render the
-// alternating per-row colored bar. Width 2 (one glyph + one space). Call this
-// inside any *Cols helper that feeds NewTable / SetColumns.
-func WithStripeColumn(cols []Column) []Column {
-	out := make([]Column, 0, len(cols)+1)
-	out = append(out, Column{Title: " ", Width: 2})
-	out = append(out, cols...)
-	return out
+// WithStripeColumn is a no-op kept for backwards compatibility with screens
+// that still wrap their column lists. Stripe() draws full-row backgrounds
+// now, so a dedicated stripe column is unnecessary.
+func WithStripeColumn(cols []Column) []Column { return cols }
+
+var stripeBgs = []lipgloss.AdaptiveColor{
+	{Light: "#f8fafc", Dark: "#0e1620"},
+	{Light: "#e2e8f0", Dark: "#1a2332"},
 }
 
-// withStripeColumn is the unexported alias kept for the NewTable internal call.
-func withStripeColumn(cols []Column) []Column { return WithStripeColumn(cols) }
-
-// Stripe wraps each row with its alternating leading bar. Call this on the
-// rows you build before SetRows.
-func Stripe(rows []Row) []Row {
-	colors := []lipgloss.AdaptiveColor{
-		{Light: "#0891b2", Dark: "#22d3ee"}, // cyan
-		{Light: "#d97706", Dark: "#fbbf24"}, // amber
-	}
+// Stripe pads each cell to its column width and applies an alternating row
+// background so individual rows are visually distinct.
+func Stripe(rows []Row, cols []Column) []Row {
 	out := make([]Row, 0, len(rows))
 	for i, r := range rows {
-		c := colors[i%len(colors)]
-		bar := lipgloss.NewStyle().Foreground(c).Bold(true).Render("▎")
-		out = append(out, append(Row{bar}, r...))
+		bg := stripeBgs[i%len(stripeBgs)]
+		styled := make(Row, 0, len(r))
+		for ci, val := range r {
+			width := 0
+			if ci < len(cols) {
+				width = cols[ci].Width
+			}
+			cellStyle := lipgloss.NewStyle().Background(bg).Padding(0, 1)
+			if width > 0 {
+				cellStyle = cellStyle.Width(width).MaxWidth(width)
+			}
+			styled = append(styled, cellStyle.Render(val))
+		}
+		out = append(out, styled)
 	}
 	return out
 }

@@ -202,7 +202,7 @@ func (f *Finances) refreshRows() {
 			x.Name,
 		})
 	}
-	f.debtsTbl.SetRows(components.Stripe(drows))
+	f.debtsTbl.SetRows(components.Stripe(drows, debtCols(f.width-6)))
 	irows := make([]components.Row, 0, len(f.incomes))
 	for _, x := range f.incomes {
 		irows = append(irows, components.Row{
@@ -212,7 +212,7 @@ func (f *Finances) refreshRows() {
 			x.Name,
 		})
 	}
-	f.incomesTbl.SetRows(components.Stripe(irows))
+	f.incomesTbl.SetRows(components.Stripe(irows, incomeCols(f.width-6)))
 	erows := make([]components.Row, 0, len(f.expenses))
 	for _, x := range f.expenses {
 		erows = append(erows, components.Row{
@@ -223,7 +223,7 @@ func (f *Finances) refreshRows() {
 			x.Name,
 		})
 	}
-	f.expensesTbl.SetRows(components.Stripe(erows))
+	f.expensesTbl.SetRows(components.Stripe(erows, expenseCols(f.width-6)))
 }
 
 func (f *Finances) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {

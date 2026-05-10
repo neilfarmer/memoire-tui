@@ -233,7 +233,7 @@ func (n *Notes) refilter() {
 			shortDate(x.UpdatedAt),
 		})
 	}
-	n.tbl.SetRows(components.Stripe(rows))
+	n.tbl.SetRows(components.Stripe(rows, noteCols(n.width-6)))
 	frows := make([]components.Row, 0, len(n.folders)+1)
 	// "All notes" pseudo-folder lets users browse without filtering.
 	frows = append(frows, components.Row{"All notes", fmt.Sprintf("%d", len(n.notes))})
@@ -246,7 +246,7 @@ func (n *Notes) refilter() {
 		}
 		frows = append(frows, components.Row{f.Name, fmt.Sprintf("%d", count)})
 	}
-	n.folderTbl.SetRows(components.Stripe(frows))
+	n.folderTbl.SetRows(components.Stripe(frows, folderCols(n.width-6)))
 }
 
 func (n *Notes) folderName(id string) string {

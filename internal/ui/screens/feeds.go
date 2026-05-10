@@ -162,7 +162,7 @@ func (f *Feeds) refreshRows() {
 		}
 		frows = append(frows, components.Row{truncate(title, 28)})
 	}
-	f.feedsTbl.SetRows(components.Stripe(frows))
+	f.feedsTbl.SetRows(components.Stripe(frows, feedTblCols()))
 	arows := make([]components.Row, 0, len(f.articles))
 	for _, a := range f.articles {
 		mark := " "
@@ -173,7 +173,7 @@ func (f *Feeds) refreshRows() {
 			mark, truncate(a.PubDate, 12), truncate(a.SourceFeed, 18), a.Title,
 		})
 	}
-	f.articlesTbl.SetRows(components.Stripe(arows))
+	f.articlesTbl.SetRows(components.Stripe(arows, articleTblCols(f.width-32)))
 }
 
 func (f *Feeds) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
