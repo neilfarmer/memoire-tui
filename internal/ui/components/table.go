@@ -29,6 +29,13 @@ var stripeBg = lipgloss.AdaptiveColor{Light: "#e2e8f0", Dark: "#1e2a3a"}
 // upstream bubbles/table v1.0.0 does not expose; we use it to paint
 // alternating backgrounds without smuggling ANSI into cell values (which
 // would confuse runewidth.Truncate inside renderRow).
+//
+// Callers pass logical column widths that should sum to contentWidth.
+// bubbles/table's default Cell style has Padding(0, 1) which adds 2
+// columns of horizontal padding per cell at render time; left unhandled
+// the rendered row would be wider than contentWidth and wrap, producing
+// visible blank lines between every-other row. We zero the cell padding
+// here so the sum stays predictable.
 func NewTable(cols []Column, rows []Row, height int) striped.Model {
 	t := striped.New(
 		striped.WithColumns(cols),
@@ -37,7 +44,10 @@ func NewTable(cols []Column, rows []Row, height int) striped.Model {
 		striped.WithHeight(height),
 	)
 	s := striped.DefaultStyles()
-	s.Header = s.Header.
+	// Drop default Cell + Header padding — see godoc above. Header inherits
+	// from DefaultStyles which sets Padding(0, 1); zero it explicitly.
+	s.Cell = lipgloss.NewStyle()
+	s.Header = lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(styles.Border).
 		BorderBottom(true).
