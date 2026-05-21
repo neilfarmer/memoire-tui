@@ -227,8 +227,17 @@ func (h *Habits) View() string {
 	if len(h.habits) == 0 {
 		return styles.MutedText.Render("No habits yet. Press n to create one.")
 	}
+	// Window the habit list so the cursor stays visible. Each rendered
+	// habit is 4 lines (top border + name + history + bottom border);
+	// we slice into a window that follows the cursor and reserve two
+	// lines for "N more above/below" hints.
+	start, end := habitWindow(h.cursor, len(h.habits), h.height)
 	rows := []string{}
-	for i, x := range h.habits {
+	if start > 0 {
+		rows = append(rows, styles.MutedText.Render(fmt.Sprintf("↑ %d more above", start)))
+	}
+	for i := start; i < end; i++ {
+		x := h.habits[i]
 		head := fmt.Sprintf("%-30s  streak %d  best %d", truncate(x.Name, 30), x.CurrentStreak, x.BestStreak)
 		hist := renderHistory(x.History)
 		row := head + "\n" + styles.MutedText.Render(hist)
@@ -239,7 +248,39 @@ func (h *Habits) View() string {
 		}
 		rows = append(rows, row)
 	}
+	if end < len(h.habits) {
+		rows = append(rows, styles.MutedText.Render(fmt.Sprintf("↓ %d more below", len(h.habits)-end)))
+	}
 	return lipgloss.JoinVertical(lipgloss.Left, rows...)
+}
+
+// habitWindow returns [start, end) into a habits slice such that cursor
+// is visible given the available terminal height. Each habit renders as
+// a 4-line box. Two lines are reserved for the "more above/below" hints
+// so the window doesn't push them off-screen on edge resizes.
+func habitWindow(cursor, total, height int) (int, int) {
+	const linesPerHabit = 4
+	available := height - 2
+	if available < linesPerHabit {
+		available = linesPerHabit
+	}
+	maxVisible := available / linesPerHabit
+	if maxVisible < 1 {
+		maxVisible = 1
+	}
+	if maxVisible >= total {
+		return 0, total
+	}
+	start := 0
+	if cursor >= maxVisible {
+		start = cursor - maxVisible + 1
+	}
+	end := start + maxVisible
+	if end > total {
+		end = total
+		start = end - maxVisible
+	}
+	return start, end
 }
 
 func renderHistory(history []api.HabitHistory) string {
