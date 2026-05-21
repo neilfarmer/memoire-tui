@@ -284,7 +284,13 @@ func (a *Assistant) View() string {
 		inputBoxLines      = 5
 		messagesBorderLine = 2
 	)
-	rightWidth := a.width - convoWidth - 3
+	// body width budget: convos(convoWidth+2 border) + spacer(2) +
+	// right(rightWidth+2 border) must equal a.width, so
+	// rightWidth = a.width - convoWidth - 6. The old constant 3 was
+	// off and pushed the body 3 cols past the app's contentBox,
+	// forcing lipgloss to wrap every row and double the rendered
+	// height — which is what hid the input box on real terminals.
+	rightWidth := a.width - convoWidth - 6
 	if rightWidth < 30 {
 		rightWidth = 30
 	}
