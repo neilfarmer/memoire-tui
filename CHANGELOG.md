@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.4.0](https://github.com/neilfarmer/memoire-tui/compare/v0.3.0...v0.4.0) (2026-05-21)
+
+
+### Features
+
+* **assistant:** always show convo cursor + ctrl+k to jump to convos pane ([c45f61f](https://github.com/neilfarmer/memoire-tui/commit/c45f61f3b8776e30ea9f23fbecc8d609d27b8372))
+* **assistant:** UI overhaul + fix dead ctrl+m model toggle ([#19](https://github.com/neilfarmer/memoire-tui/issues/19)) ([d9c2b09](https://github.com/neilfarmer/memoire-tui/commit/d9c2b09d3fcf43898db702b525d37ba6843d1a37))
+* **tui:** ANSI Shadow memoire splash for boot + dashboard loading ([#18](https://github.com/neilfarmer/memoire-tui/issues/18)) ([d205174](https://github.com/neilfarmer/memoire-tui/commit/d2051748a6001533b7dbcdef2c9d065ece536a20))
+* **tui:** wrap the entire app in a double-line outer border ([341e596](https://github.com/neilfarmer/memoire-tui/commit/341e5962c7f6adb3bddca0705cb611bd380aef1b))
+
+
+### Bug Fixes
+
+* **assistant:** correct rightWidth math so the body fits content area ([0b0f920](https://github.com/neilfarmer/memoire-tui/commit/0b0f92070a7f4aeb0a210b19cf11c151780df020))
+* **assistant:** refocus input on re-entry; bind ctrl+y as global model toggle ([8e36c13](https://github.com/neilfarmer/memoire-tui/commit/8e36c1380f42da723871eb9ad83d0d902eca6046))
+* **assistant:** restore input box visibility ([d61aee6](https://github.com/neilfarmer/memoire-tui/commit/d61aee6cb701b2600dac0ccf895243c64c1effab))
+* **assistant:** stop ANSI codes leaking in cursor-highlighted convo row ([a9d552e](https://github.com/neilfarmer/memoire-tui/commit/a9d552eaf2b54983a3d1605059b0af4aefdf88f1))
+* **habits:** window the rendered list so the cursor stays visible ([#16](https://github.com/neilfarmer/memoire-tui/issues/16)) ([d984f29](https://github.com/neilfarmer/memoire-tui/commit/d984f292568854eacc95748bfb8a039b2cb041bf))
+* **tui:** capture delete target on 'd', not after table moves cursor ([#13](https://github.com/neilfarmer/memoire-tui/issues/13)) ([5c83fa7](https://github.com/neilfarmer/memoire-tui/commit/5c83fa77d6e3a056b80f2710bb482cc8b140301d))
+* **tui:** delete the selected task, not the row above/below ([9817bb1](https://github.com/neilfarmer/memoire-tui/commit/9817bb1c5db3487294ba977901192fee8989cf85))
+* **tui:** delete the selected task, not the row above/below ([246bf15](https://github.com/neilfarmer/memoire-tui/commit/246bf15c476b386496646f448f4d8f6f3406773d))
+* **tui:** esc in assistant returns focus to sidebar instead of being swallowed ([#17](https://github.com/neilfarmer/memoire-tui/issues/17)) ([a7175ff](https://github.com/neilfarmer/memoire-tui/commit/a7175ffcc31f33630589f76ce529e20cf6875ce3))
+
 ## [0.3.0](https://github.com/neilfarmer/memoire-tui/compare/v0.2.0...v0.3.0) (2026-05-10)
 
 
