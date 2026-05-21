@@ -66,13 +66,13 @@ func buildEditorCommand(editor, path string) *exec.Cmd {
 	if runtime.GOOS == "windows" {
 		parts := strings.Fields(editor)
 		args := append(parts[1:], path)
-		return exec.Command(parts[0], args...) //#nosec G204 -- $EDITOR is user config
+		return exec.Command(parts[0], args...) //#nosec G204,G702 -- $EDITOR is user config; intentional shell-out
 	}
 	// Single-quote the tmpfile path defensively, escaping any embedded
 	// single quotes. The path is from os.CreateTemp so this is precaution
 	// rather than a known attack vector.
 	quoted := "'" + strings.ReplaceAll(path, "'", `'\''`) + "'"
-	return exec.Command("/bin/sh", "-c", editor+" "+quoted) //#nosec G204 -- $EDITOR is user config
+	return exec.Command("/bin/sh", "-c", editor+" "+quoted) //#nosec G204,G702 -- $EDITOR is user config; intentional shell-out
 }
 
 func normaliseExt(ext string) string {

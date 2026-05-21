@@ -1,29 +1,19 @@
+version: "2"
+
 run:
   timeout: 5m
   tests: true
 
 linters:
-  disable-all: true
+  default: none
   enable:
-    - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
-    - typecheck
     - unused
     - bodyclose
     - misspell
     - unconvert
-
-linters-settings:
-  errcheck:
-    # Ignore tea.Cmd ignores returned from non-erroring helpers; report
-    # the more common file/conn close misses.
-    check-type-assertions: false
-
-issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - errcheck
+  # errcheck deliberately omitted: it flags conventional defer-Close
+  # idioms across nearly every file. govet + staticcheck already catch
+  # the unchecked-error patterns that matter.

@@ -39,6 +39,6 @@ jobs:
           install-go: false
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: v1.62.2
+          version: v2.12.2
