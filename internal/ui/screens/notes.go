@@ -182,7 +182,12 @@ func (n *Notes) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return n, nil
 		}
 		n.formData.body = m.Content
-		return n, nil
+		// Rebuild the form so huh's text widget re-reads body from the
+		// binding pointer. Without this its internal textarea buffer
+		// (frozen at the pre-editor state) overwrites formData.body on
+		// the next keypress and the editor's work is lost.
+		n.form = n.newForm("Edit note")
+		return n, n.form.Init()
 	case tea.KeyMsg:
 		return n.handleKey(m)
 	}

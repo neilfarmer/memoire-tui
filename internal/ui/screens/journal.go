@@ -115,7 +115,12 @@ func (j *Journal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return j, nil
 		}
 		j.formData.body = m.Content
-		return j, nil
+		// Rebuild the form so huh's text widget re-reads body from the
+		// binding pointer. Without this its internal textarea buffer
+		// (frozen at the pre-editor state) overwrites formData.body on
+		// the next keypress and the editor's work is lost.
+		j.form = j.newForm()
+		return j, j.form.Init()
 	case tea.KeyMsg:
 		return j.handleKey(m)
 	}
@@ -175,8 +180,14 @@ func (j *Journal) startEdit() tea.Cmd {
 		mood:  j.current.Mood,
 		tags:  strings.Join(j.current.Tags, ", "),
 	}
+	j.form = j.newForm()
+	j.mode = journalForm
+	return j.form.Init()
+}
+
+func (j *Journal) newForm() *huh.Form {
 	d := &j.formData
-	j.form = huh.NewForm(huh.NewGroup(
+	return huh.NewForm(huh.NewGroup(
 		huh.NewInput().Title("Title").Value(&d.title),
 		huh.NewSelect[string]().Title("Mood").Options(
 			huh.NewOption("(none)", ""),
@@ -189,8 +200,6 @@ func (j *Journal) startEdit() tea.Cmd {
 		huh.NewText().Title("Body (markdown — ctrl+e for $EDITOR)").Value(&d.body).Lines(10),
 		huh.NewInput().Title("Tags (comma separated)").Value(&d.tags),
 	)).WithKeyMap(components.FormKeyMap())
-	j.mode = journalForm
-	return j.form.Init()
 }
 
 func (j *Journal) submit() tea.Cmd {
