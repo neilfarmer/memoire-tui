@@ -380,21 +380,28 @@ func (a *Assistant) renderConvos(width, height int) string {
 			ts = relativeTime(c.CreatedAt)
 		}
 		titleStr := truncate(title, titleWidth-len(ts)-2)
-		line := titleStr + "  " + styles.MutedText.Render(ts)
+		// Build the row in plain text first; apply styling exactly
+		// once at the end so we never nest a Foreground/Underline
+		// wrapper over a pre-styled muted timestamp (lipgloss leaks
+		// the inner reset and the raw "[0m" bleeds into the cell).
+		marker := "  "
 		if active {
-			line = lipgloss.NewStyle().Foreground(styles.Primary).Bold(true).Render("● ") + line
-		} else {
-			line = "  " + line
+			marker = "● "
 		}
-		// Always show the cursor — bright when the pane is focused, a
-		// muted underline otherwise — so the user sees what would be
-		// selected before they tab over.
-		if i == a.convCur {
-			if a.pane == assistantPaneConvos {
-				line = styles.Selected.Render(line)
-			} else {
-				line = lipgloss.NewStyle().Foreground(styles.Primary).Underline(true).Render(line)
-			}
+		plain := marker + titleStr + "  " + ts
+
+		var line string
+		switch {
+		case i == a.convCur && a.pane == assistantPaneConvos:
+			line = styles.Selected.Render(plain)
+		case i == a.convCur:
+			line = lipgloss.NewStyle().Foreground(styles.Primary).Underline(true).Render(plain)
+		case active:
+			// Highlight the bullet in primary; muted timestamp.
+			line = lipgloss.NewStyle().Foreground(styles.Primary).Bold(true).Render("● ") +
+				titleStr + "  " + styles.MutedText.Render(ts)
+		default:
+			line = "  " + titleStr + "  " + styles.MutedText.Render(ts)
 		}
 		rows = append(rows, line)
 	}
