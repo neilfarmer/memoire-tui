@@ -288,7 +288,7 @@ func (a *App) setFlash(f FlashMsg) tea.Cmd {
 
 func (a *App) View() string {
 	if a.width == 0 || a.height == 0 {
-		return "loading..."
+		return components.Splash(0, 0, "loading…")
 	}
 	header := components.Header{
 		Section:   SidebarLabels[a.current],

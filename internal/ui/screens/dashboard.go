@@ -114,7 +114,7 @@ func (d *Dashboard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (d *Dashboard) View() string {
 	if d.loading {
-		return styles.MutedText.Render("Loading dashboard...")
+		return components.Splash(d.width, d.height, "loading your memoire…")
 	}
 	if d.err != nil {
 		return styles.DangerText.Render("Error: " + d.err.Error())
