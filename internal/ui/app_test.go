@@ -64,6 +64,56 @@ func min(a, b int) int {
 	return b
 }
 
+// TestEscapeFromAssistantReturnsToSidebar regression-tests the user-reported
+// bug: once inside the Assistant screen, the chat textarea is focused and
+// IsTextEditing returns true. The old esc handler short-circuited on
+// IsTextEditing and forwarded esc to the screen, which then forwarded it
+// to the textarea, which silently swallowed it — so the user was stuck
+// inside the screen with no way out.
+//
+// Asserts: after pressing esc inside Assistant, sidebar focus is restored
+// and a subsequent esc triggers the quit-confirm overlay (the documented
+// next step).
+func TestEscapeFromAssistantReturnsToSidebar(t *testing.T) {
+	client := api.New("https://example.com", "pat_test")
+	app := New(client, DefaultFactories(client))
+	_ = app.Init()
+	app.Update(tea.WindowSizeMsg{Width: 100, Height: 40})
+
+	// Walk down the sidebar until we land on Assistant. Cap iterations at
+	// the sidebar length so an unreachable target doesn't hang the test.
+	a := app
+	for i := 0; i < len(SidebarOrder) && a.current != ScreenAssistant; i++ {
+		m, _ := a.Update(tea.KeyMsg{Type: tea.KeyDown})
+		a = m.(*App)
+	}
+	if a.current != ScreenAssistant {
+		t.Fatalf("Assistant not reachable from sidebar; landed on %s", a.current)
+	}
+	// Drill into the screen (sidebar focus → content focus).
+	m, _ := a.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	a = m.(*App)
+	if a.sideFocus {
+		t.Fatal("expected sideFocus=false after enter from sidebar")
+	}
+
+	// Press esc — the bug was this doing nothing. Expectation: focus
+	// returns to sidebar.
+	m, _ = a.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	a = m.(*App)
+	if !a.sideFocus {
+		t.Errorf("expected esc to return focus to sidebar, but sideFocus=%v", a.sideFocus)
+	}
+
+	// One more esc should now trigger quit-confirm, proving we really
+	// did pop back to the sidebar and didn't just no-op.
+	m, _ = a.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	a = m.(*App)
+	if !a.quitConfirm {
+		t.Errorf("expected quit confirm after second esc from sidebar; got quitConfirm=%v", a.quitConfirm)
+	}
+}
+
 func TestIsTerminalNoiseKey(t *testing.T) {
 	cases := []struct {
 		in   string

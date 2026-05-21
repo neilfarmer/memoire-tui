@@ -200,16 +200,18 @@ func (a *App) handleKey(m tea.KeyMsg) (tea.Cmd, bool) {
 	}
 	// Esc drill-up:
 	//   sidebar focused → quit confirm (regardless of which screen is shown)
-	//   content focused, screen sub-mode → screen.OnEscape pops one level
-	//   content focused, top level → return focus to sidebar
+	//   content focused → ask screen.OnEscape; if it returns true the screen
+	//     consumed esc (popped a sub-mode); if false the screen is at its
+	//     top level and we return focus to the sidebar
+	//
+	// IsTextEditing is intentionally NOT consulted here — esc is navigation,
+	// not content. A screen that wants special esc semantics while a textarea
+	// is focused (e.g. Assistant blurring the chat input) can do that inside
+	// its OnEscape.
 	if m.String() == "esc" {
 		if a.sideFocus {
 			a.quitConfirm = true
 			return nil, true
-		}
-		// Content focused. Forms / chat textareas handle their own esc.
-		if a.currentScreenIsEditing() {
-			return nil, false
 		}
 		if cur, ok := a.registry[a.current]; ok {
 			if e, ok := cur.(escapableScreen); ok {

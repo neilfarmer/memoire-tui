@@ -308,7 +308,11 @@ func (a *Assistant) SetSize(w, h int) { a.width, a.height = w, h }
 func (a *Assistant) IsTextEditing() bool { return a.pane == assistantPaneInput }
 
 func (a *Assistant) OnEscape() bool {
-	// Assistant is always at top level; the textarea handles its own esc.
+	// Blur the chat textarea so a subsequent esc — or the app immediately
+	// popping focus to the sidebar — doesn't leave the input visually
+	// holding focus. Assistant has no sub-mode tree to pop, so return
+	// false and let the app return focus to the sidebar.
+	a.input.Blur()
 	return false
 }
 
