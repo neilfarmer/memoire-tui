@@ -146,6 +146,12 @@ func (a *Assistant) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// literal letter.
 		a.toggleModel()
 		return a, nil
+	case "ctrl+k":
+		// One-shot jump straight to the conversations pane so the
+		// user can pick a chat without tabbing past messages.
+		a.pane = assistantPaneConvos
+		a.input.Blur()
+		return a, nil
 	case "tab":
 		a.pane = (a.pane + 1) % 3
 		switch a.pane {
@@ -380,8 +386,15 @@ func (a *Assistant) renderConvos(width, height int) string {
 		} else {
 			line = "  " + line
 		}
-		if i == a.convCur && a.pane == assistantPaneConvos {
-			line = styles.Selected.Render(line)
+		// Always show the cursor — bright when the pane is focused, a
+		// muted underline otherwise — so the user sees what would be
+		// selected before they tab over.
+		if i == a.convCur {
+			if a.pane == assistantPaneConvos {
+				line = styles.Selected.Render(line)
+			} else {
+				line = lipgloss.NewStyle().Foreground(styles.Primary).Underline(true).Render(line)
+			}
 		}
 		rows = append(rows, line)
 	}
@@ -470,9 +483,9 @@ func (a *Assistant) StatusHints() []string {
 	return []string{
 		styles.KeyHint("ctrl+j", "send"),
 		styles.KeyHint("ctrl+y", "model"),
+		styles.KeyHint("ctrl+k", "convos"),
 		styles.KeyHint("ctrl+n", "new"),
 		styles.KeyHint("ctrl+l", "clear"),
-		styles.KeyHint("tab", "pane"),
 	}
 }
 func (a *Assistant) Help() []components.HelpEntry {
@@ -482,6 +495,7 @@ func (a *Assistant) Help() []components.HelpEntry {
 		{Keys: "m", Desc: "alternate model toggle — only fires outside the input pane"},
 		{Keys: "ctrl+l", Desc: "clear current conversation"},
 		{Keys: "ctrl+n", Desc: "start a new conversation"},
+		{Keys: "ctrl+k", Desc: "jump to conversations pane (then ↑/↓ + enter to open one)"},
 		{Keys: "tab", Desc: "cycle pane (input / conversations / messages)"},
 		{Keys: "enter (in conversations)", Desc: "open conversation"},
 		{Keys: ":model-nova-lite / :model-nova-pro", Desc: "switch model via the command palette"},
