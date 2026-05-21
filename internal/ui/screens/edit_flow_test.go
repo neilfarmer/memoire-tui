@@ -34,13 +34,15 @@ func newFakeBackend(t *testing.T) *fakeBackend {
 
 		switch {
 		case r.URL.Path == "/tasks" && r.Method == "GET":
-			_, _ = w.Write([]byte(`[{"task_id":"t1","title":"Old","status":"todo","priority":"low"}]`))
+			// Note: smartLess sorts by priority ascending, so list t1 as
+			// "high" to keep it at index 0 for downstream tests.
+			_, _ = w.Write([]byte(`[{"task_id":"t1","title":"Old","status":"todo","priority":"high"},{"task_id":"t2","title":"Two","status":"todo","priority":"medium"},{"task_id":"t3","title":"Three","status":"todo","priority":"low"}]`))
 		case r.URL.Path == "/tasks" && r.Method == "POST":
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"task_id":"t2","title":"New"}`))
+			_, _ = w.Write([]byte(`{"task_id":"tx","title":"New"}`))
 		case r.URL.Path == "/tasks/t1" && r.Method == "PUT":
 			_, _ = w.Write([]byte(`{"task_id":"t1","title":"Updated"}`))
-		case r.URL.Path == "/tasks/t1" && r.Method == "DELETE":
+		case strings.HasPrefix(r.URL.Path, "/tasks/") && r.Method == "DELETE":
 			w.WriteHeader(http.StatusNoContent)
 
 		case r.URL.Path == "/notes" && r.Method == "GET":
@@ -64,20 +66,24 @@ func newFakeBackend(t *testing.T) *fakeBackend {
 			_, _ = w.Write([]byte(`{"habit_id":"h1","name":"Run updated"}`))
 
 		case r.URL.Path == "/goals" && r.Method == "GET":
-			_, _ = w.Write([]byte(`[{"goal_id":"g1","title":"G","status":"active"}]`))
+			_, _ = w.Write([]byte(`[{"goal_id":"g1","title":"G","status":"active"},{"goal_id":"g2","title":"G2","status":"active"},{"goal_id":"g3","title":"G3","status":"active"}]`))
 		case r.URL.Path == "/goals" && r.Method == "POST":
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"goal_id":"g2"}`))
+			_, _ = w.Write([]byte(`{"goal_id":"gx"}`))
 		case r.URL.Path == "/goals/g1" && r.Method == "PUT":
 			_, _ = w.Write([]byte(`{"goal_id":"g1"}`))
+		case strings.HasPrefix(r.URL.Path, "/goals/") && r.Method == "DELETE":
+			w.WriteHeader(http.StatusNoContent)
 
 		case r.URL.Path == "/bookmarks" && r.Method == "GET":
-			_, _ = w.Write([]byte(`[{"bookmark_id":"b1","url":"https://x","title":"X"}]`))
+			_, _ = w.Write([]byte(`[{"bookmark_id":"b1","url":"https://x","title":"X"},{"bookmark_id":"b2","url":"https://y","title":"Y"},{"bookmark_id":"b3","url":"https://z","title":"Z"}]`))
 		case r.URL.Path == "/bookmarks" && r.Method == "POST":
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"bookmark_id":"b2"}`))
+			_, _ = w.Write([]byte(`{"bookmark_id":"bx"}`))
 		case r.URL.Path == "/bookmarks/b1" && r.Method == "PUT":
 			_, _ = w.Write([]byte(`{"bookmark_id":"b1"}`))
+		case strings.HasPrefix(r.URL.Path, "/bookmarks/") && r.Method == "DELETE":
+			w.WriteHeader(http.StatusNoContent)
 
 		case r.URL.Path == "/journal" && r.Method == "GET":
 			_, _ = w.Write([]byte(`[]`))
@@ -87,15 +93,17 @@ func newFakeBackend(t *testing.T) *fakeBackend {
 			_, _ = w.Write([]byte(`{"entry_date":"2026-04-30","content":"hi"}`))
 
 		case r.URL.Path == "/feeds" && r.Method == "GET":
-			_, _ = w.Write([]byte(`[]`))
+			_, _ = w.Write([]byte(`[{"feed_id":"fd1","url":"https://a","title":"A"},{"feed_id":"fd2","url":"https://b","title":"B"},{"feed_id":"fd3","url":"https://c","title":"C"}]`))
 		case r.URL.Path == "/feeds" && r.Method == "POST":
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"feed_id":"fd1"}`))
+			_, _ = w.Write([]byte(`{"feed_id":"fdx"}`))
+		case strings.HasPrefix(r.URL.Path, "/feeds/") && r.Method == "DELETE":
+			w.WriteHeader(http.StatusNoContent)
 		case r.URL.Path == "/feeds/articles" && r.Method == "GET":
 			_, _ = w.Write([]byte(`[]`))
 
 		case r.URL.Path == "/debts" && r.Method == "GET":
-			_, _ = w.Write([]byte(`[]`))
+			_, _ = w.Write([]byte(`[{"debt_id":"d1","name":"D1","type":"credit_card","balance":100},{"debt_id":"d2","name":"D2","type":"credit_card","balance":200},{"debt_id":"d3","name":"D3","type":"credit_card","balance":300}]`))
 		case r.URL.Path == "/income" && r.Method == "GET":
 			_, _ = w.Write([]byte(`[]`))
 		case r.URL.Path == "/fixed-expenses" && r.Method == "GET":
@@ -104,7 +112,9 @@ func newFakeBackend(t *testing.T) *fakeBackend {
 			_, _ = w.Write([]byte(`{}`))
 		case r.URL.Path == "/debts" && r.Method == "POST":
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"debt_id":"d1"}`))
+			_, _ = w.Write([]byte(`{"debt_id":"dx"}`))
+		case strings.HasPrefix(r.URL.Path, "/debts/") && r.Method == "DELETE":
+			w.WriteHeader(http.StatusNoContent)
 
 		case r.URL.Path == "/settings" && r.Method == "GET":
 			_, _ = w.Write([]byte(`{"display_name":"Neil"}`))
@@ -126,7 +136,9 @@ func newFakeBackend(t *testing.T) *fakeBackend {
 			_, _ = w.Write([]byte(`{"log_date":"2026-04-30"}`))
 
 		case r.URL.Path == "/favorites" && r.Method == "GET":
-			_, _ = w.Write([]byte(`[]`))
+			_, _ = w.Write([]byte(`[{"favorite_id":"v1","url":"https://x","title":"X"},{"favorite_id":"v2","url":"https://y","title":"Y"},{"favorite_id":"v3","url":"https://z","title":"Z"}]`))
+		case strings.HasPrefix(r.URL.Path, "/favorites/") && r.Method == "DELETE":
+			w.WriteHeader(http.StatusNoContent)
 		case r.URL.Path == "/tokens" && r.Method == "GET":
 			_, _ = w.Write([]byte(`[]`))
 		case r.URL.Path == "/tokens" && r.Method == "POST":

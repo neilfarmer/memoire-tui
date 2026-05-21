@@ -36,6 +36,8 @@ type Bookmarks struct {
 	tag    string
 	form   *huh.Form
 	formIn bookmarkFormState
+
+	pendingDeleteID string
 }
 
 type bookmarkFormState struct {
@@ -140,6 +142,7 @@ func (b *Bookmarks) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		if m.String() == "n" || m.String() == "esc" {
 			b.mode = bookmarkList
+			b.pendingDeleteID = ""
 		}
 		return b, nil
 	case bookmarkDetail:
@@ -149,7 +152,10 @@ func (b *Bookmarks) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "e":
 			return b, b.startEdit()
 		case "d":
-			b.mode = bookmarkConfirmDelete
+			if x := b.selected(); x != nil {
+				b.pendingDeleteID = x.BookmarkID
+				b.mode = bookmarkConfirmDelete
+			}
 		case "o":
 			if x := b.selected(); x != nil {
 				return b, components.OpenURL(x.URL)
@@ -189,9 +195,11 @@ func (b *Bookmarks) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "e":
 		return b, b.startEdit()
 	case "d":
-		if b.tbl.Cursor() < len(b.items) {
+		if x := b.selected(); x != nil {
+			b.pendingDeleteID = x.BookmarkID
 			b.mode = bookmarkConfirmDelete
 		}
+		return b, nil
 	case "r", "ctrl+r":
 		return b, b.refresh()
 	}
@@ -266,11 +274,11 @@ func (b *Bookmarks) submit() tea.Cmd {
 }
 
 func (b *Bookmarks) deleteSelected() tea.Cmd {
-	x := b.selected()
-	if x == nil {
+	id := b.pendingDeleteID
+	b.pendingDeleteID = ""
+	if id == "" {
 		return nil
 	}
-	id := x.BookmarkID
 	c := b.client
 	return func() tea.Msg { return bookmarksMutatedMsg{err: c.DeleteBookmark(id)} }
 }
@@ -362,6 +370,7 @@ func (b *Bookmarks) OnEscape() bool {
 	switch b.mode {
 	case bookmarkDetail, bookmarkConfirmDelete:
 		b.mode = bookmarkList
+		b.pendingDeleteID = ""
 		return true
 	case bookmarkForm:
 		b.mode = bookmarkList

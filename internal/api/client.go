@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -72,6 +73,12 @@ func (c *Client) Do(method, path string, body, out any) error {
 
 // DoQuery is like Do but appends url.Values to the request URL.
 func (c *Client) DoQuery(method, path string, q url.Values, body, out any) error {
+	return c.DoContext(context.Background(), method, path, q, body, out)
+}
+
+// DoContext is the cancellable form. Callers that need to abort a request
+// (e.g. a Bubble Tea screen being torn down) should use this.
+func (c *Client) DoContext(ctx context.Context, method, path string, q url.Values, body, out any) error {
 	if c.BaseURL == "" {
 		return errors.New("api: BaseURL not set")
 	}
@@ -90,7 +97,7 @@ func (c *Client) DoQuery(method, path string, q url.Values, body, out any) error
 		}
 		reader = bytes.NewReader(buf)
 	}
-	req, err := http.NewRequest(method, full, reader)
+	req, err := http.NewRequestWithContext(ctx, method, full, reader)
 	if err != nil {
 		return err
 	}
@@ -106,7 +113,11 @@ func (c *Client) DoQuery(method, path string, q url.Values, body, out any) error
 		return fmt.Errorf("%s %s: %w", method, path, err)
 	}
 	defer resp.Body.Close()
-	respBody, _ := io.ReadAll(resp.Body)
+	respBody, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		logx.Error("api response read failed", "method", method, "path", path, "status", resp.StatusCode, "err", readErr)
+		return fmt.Errorf("%s %s: read response: %w", method, path, readErr)
+	}
 	logx.Debug("api response", "method", method, "path", path, "status", resp.StatusCode, "elapsed_ms", time.Since(start).Milliseconds(), "body_len", len(respBody))
 	if resp.StatusCode >= 400 {
 		ae := &APIError{Status: resp.StatusCode, Body: string(respBody)}

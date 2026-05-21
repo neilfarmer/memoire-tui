@@ -379,24 +379,11 @@ func validateOptionalDate(s string) error {
 }
 
 func (t *Tasks) submitForm() tea.Cmd {
-	d := t.formData
-	tags := splitTags(d.tags)
-	in := api.TaskInput{
-		Title:          strings.TrimSpace(d.title),
-		Description:    d.description,
-		Status:         d.status,
-		Priority:       d.priority,
-		DueDate:        strings.TrimSpace(d.dueDate),
-		Tags:           tags,
-		ScheduledStart: strings.TrimSpace(d.scheduled),
-	}
-	if dur, err := parseInt(d.duration); err == nil && dur > 0 {
-		in.DurationMinutes = dur
-	}
+	in := buildTaskInput(t.formData)
+	id := t.formData.id
+	c := t.client
 	t.mode = taskList
 	t.form = nil
-	id := d.id
-	c := t.client
 	return func() tea.Msg {
 		var err error
 		if id == "" {
@@ -406,6 +393,22 @@ func (t *Tasks) submitForm() tea.Cmd {
 		}
 		return tasksMutatedMsg{err: err}
 	}
+}
+
+func buildTaskInput(d taskFormState) api.TaskInput {
+	in := api.TaskInput{
+		Title:          strings.TrimSpace(d.title),
+		Description:    d.description,
+		Status:         d.status,
+		Priority:       d.priority,
+		DueDate:        strings.TrimSpace(d.dueDate),
+		Tags:           splitTags(d.tags),
+		ScheduledStart: strings.TrimSpace(d.scheduled),
+	}
+	if dur, err := parseInt(d.duration); err == nil && dur > 0 {
+		in.DurationMinutes = dur
+	}
+	return in
 }
 
 func splitTags(s string) []string {
