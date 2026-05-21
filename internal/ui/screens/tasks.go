@@ -42,6 +42,8 @@ type Tasks struct {
 
 	form     *huh.Form
 	formData taskFormState
+
+	pendingDeleteID string
 }
 
 type taskFormState struct {
@@ -135,6 +137,7 @@ func (t *Tasks) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		if m.String() == "n" || m.String() == "esc" {
 			t.mode = taskList
+			t.pendingDeleteID = ""
 			return t, nil
 		}
 		return t, nil
@@ -145,7 +148,10 @@ func (t *Tasks) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "e":
 			return t, t.startEdit()
 		case "d":
-			t.mode = taskConfirmDelete
+			if idx := t.tbl.Cursor(); idx >= 0 && idx < len(t.filtered) {
+				t.pendingDeleteID = t.filtered[idx].TaskID
+				t.mode = taskConfirmDelete
+			}
 		}
 		return t, nil
 	case taskForm:
@@ -182,9 +188,11 @@ func (t *Tasks) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "e":
 		return t, t.startEdit()
 	case "d":
-		if t.tbl.Cursor() < len(t.filtered) {
+		if idx := t.tbl.Cursor(); idx >= 0 && idx < len(t.filtered) {
+			t.pendingDeleteID = t.filtered[idx].TaskID
 			t.mode = taskConfirmDelete
 		}
+		return t, nil
 	case "r", "ctrl+r":
 		t.loading = true
 		return t, t.refresh()
@@ -423,11 +431,11 @@ func parseInt(s string) (int, error) {
 }
 
 func (t *Tasks) deleteSelected() tea.Cmd {
-	idx := t.tbl.Cursor()
-	if idx < 0 || idx >= len(t.filtered) {
+	id := t.pendingDeleteID
+	t.pendingDeleteID = ""
+	if id == "" {
 		return nil
 	}
-	id := t.filtered[idx].TaskID
 	c := t.client
 	return func() tea.Msg {
 		return tasksMutatedMsg{err: c.DeleteTask(id)}
@@ -590,6 +598,7 @@ func (t *Tasks) OnEscape() bool {
 	switch t.mode {
 	case taskDetail, taskCalendar, taskConfirmDelete:
 		t.mode = taskList
+		t.pendingDeleteID = ""
 		return true
 	case taskForm:
 		t.mode = taskList
