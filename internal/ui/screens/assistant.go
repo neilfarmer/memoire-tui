@@ -67,7 +67,16 @@ func newAssistant(c *api.Client) *Assistant {
 	return a
 }
 
-func (a *Assistant) Init() tea.Cmd { return a.refreshConvos() }
+func (a *Assistant) Init() tea.Cmd {
+	// Re-entering the screen (e.g. after pressing esc → sidebar →
+	// enter Assistant again) needs to restore textarea focus so the
+	// user can type. Without this they'd have to press tab twice to
+	// cycle focus back.
+	if a.pane == assistantPaneInput {
+		a.input.Focus()
+	}
+	return a.refreshConvos()
+}
 
 func (a *Assistant) refreshConvos() tea.Cmd {
 	c := a.client
@@ -131,6 +140,12 @@ func (a *Assistant) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return a, a.clearHistory()
 	case "ctrl+n":
 		return a, a.newConversation()
+	case "ctrl+y":
+		// Globally-bound model toggle (works in every pane). Plain `m`
+		// only fires when input isn't focused so the user can type the
+		// literal letter.
+		a.toggleModel()
+		return a, nil
 	case "tab":
 		a.pane = (a.pane + 1) % 3
 		switch a.pane {
@@ -454,16 +469,17 @@ func (a *Assistant) Title() string { return "Assistant" }
 func (a *Assistant) StatusHints() []string {
 	return []string{
 		styles.KeyHint("ctrl+j", "send"),
-		styles.KeyHint("tab", "pane"),
+		styles.KeyHint("ctrl+y", "model"),
 		styles.KeyHint("ctrl+n", "new"),
 		styles.KeyHint("ctrl+l", "clear"),
-		styles.KeyHint("m", "model"),
+		styles.KeyHint("tab", "pane"),
 	}
 }
 func (a *Assistant) Help() []components.HelpEntry {
 	return []components.HelpEntry{
 		{Keys: "ctrl+j", Desc: "send message"},
-		{Keys: "m", Desc: "toggle model (nova-lite / nova-pro) — only when input is not focused"},
+		{Keys: "ctrl+y", Desc: "toggle model (nova-lite / nova-pro) — works in every pane"},
+		{Keys: "m", Desc: "alternate model toggle — only fires outside the input pane"},
 		{Keys: "ctrl+l", Desc: "clear current conversation"},
 		{Keys: "ctrl+n", Desc: "start a new conversation"},
 		{Keys: "tab", Desc: "cycle pane (input / conversations / messages)"},
@@ -479,11 +495,11 @@ func (a *Assistant) SetSize(w, h int) { a.width, a.height = w, h }
 func (a *Assistant) IsTextEditing() bool { return a.pane == assistantPaneInput }
 
 func (a *Assistant) OnEscape() bool {
-	// Blur the chat textarea so a subsequent esc — or the app immediately
-	// popping focus to the sidebar — doesn't leave the input visually
-	// holding focus. Assistant has no sub-mode tree to pop, so return
-	// false and let the app return focus to the sidebar.
-	a.input.Blur()
+	// Assistant has no sub-mode tree to pop. Return false so the app
+	// pops focus back to the sidebar. We deliberately do NOT blur the
+	// input here: blurring it would mean the textarea is still blurred
+	// when the user later re-enters the screen, breaking typing.
+	// Init() refocuses on re-entry as a belt-and-braces guarantee.
 	return false
 }
 
