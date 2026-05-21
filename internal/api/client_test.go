@@ -1,11 +1,13 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func newTestClient(handler http.Handler) (*Client, *httptest.Server) {
@@ -103,5 +105,25 @@ func TestDelete204(t *testing.T) {
 	defer srv.Close()
 	if err := c.Delete("/x/1"); err != nil {
 		t.Errorf("delete: %v", err)
+	}
+}
+
+// TestDoContextCancellation: a request cancelled via context returns the
+// cancellation error rather than blocking until the client-level timeout.
+func TestDoContextCancellation(t *testing.T) {
+	c, srv := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Hold the connection open longer than the test will wait.
+		time.Sleep(2 * time.Second)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
+	defer cancel()
+	err := c.DoContext(ctx, http.MethodGet, "/slow", nil, nil, nil)
+	if err == nil {
+		t.Fatal("expected an error from cancelled context, got nil")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("expected context.DeadlineExceeded; got %v", err)
 	}
 }

@@ -21,6 +21,8 @@ type Favorites struct {
 	items   []api.Favorite
 	tbl     components.Model
 	confirm bool
+
+	pendingDeleteID string
 }
 
 type favoritesLoadedMsg struct {
@@ -104,6 +106,7 @@ func (f *Favorites) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		if m.String() == "n" || m.String() == "esc" {
 			f.confirm = false
+			f.pendingDeleteID = ""
 		}
 		return f, nil
 	}
@@ -113,9 +116,11 @@ func (f *Favorites) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return f, components.OpenURL(x.URL)
 		}
 	case "d":
-		if f.selected() != nil {
+		if x := f.selected(); x != nil {
+			f.pendingDeleteID = x.FavoriteID
 			f.confirm = true
 		}
+		return f, nil
 	case "r", "ctrl+r":
 		return f, f.refresh()
 	}
@@ -133,11 +138,11 @@ func (f *Favorites) selected() *api.Favorite {
 }
 
 func (f *Favorites) deleteSelected() tea.Cmd {
-	x := f.selected()
-	if x == nil {
+	id := f.pendingDeleteID
+	f.pendingDeleteID = ""
+	if id == "" {
 		return nil
 	}
-	id := x.FavoriteID
 	c := f.client
 	return func() tea.Msg { return favoritesMutatedMsg{err: c.DeleteFavorite(id)} }
 }
@@ -188,6 +193,7 @@ func (f *Favorites) SetSize(w, h int) {
 func (f *Favorites) OnEscape() bool {
 	if f.confirm {
 		f.confirm = false
+		f.pendingDeleteID = ""
 		return true
 	}
 	return false

@@ -36,6 +36,8 @@ type Goals struct {
 	tbl     components.Model
 	form    *huh.Form
 	formIn  goalFormState
+
+	pendingDeleteID string
 }
 
 type goalFormState struct {
@@ -125,6 +127,7 @@ func (g *Goals) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		if m.String() == "n" || m.String() == "esc" {
 			g.mode = goalList
+			g.pendingDeleteID = ""
 		}
 		return g, nil
 	case goalDetail:
@@ -134,7 +137,10 @@ func (g *Goals) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "e":
 			return g, g.startEdit()
 		case "d":
-			g.mode = goalConfirmDelete
+			if idx := g.tbl.Cursor(); idx >= 0 && idx < len(g.view) {
+				g.pendingDeleteID = g.view[idx].GoalID
+				g.mode = goalConfirmDelete
+			}
 		}
 		return g, nil
 	case goalForm:
@@ -166,9 +172,11 @@ func (g *Goals) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "e":
 		return g, g.startEdit()
 	case "d":
-		if g.tbl.Cursor() < len(g.view) {
+		if idx := g.tbl.Cursor(); idx >= 0 && idx < len(g.view) {
+			g.pendingDeleteID = g.view[idx].GoalID
 			g.mode = goalConfirmDelete
 		}
+		return g, nil
 	case "f":
 		g.filter = nextGoalFilter(g.filter)
 		g.refilter()
@@ -292,11 +300,11 @@ func (g *Goals) submit() tea.Cmd {
 }
 
 func (g *Goals) deleteSelected() tea.Cmd {
-	idx := g.tbl.Cursor()
-	if idx >= len(g.view) {
+	id := g.pendingDeleteID
+	g.pendingDeleteID = ""
+	if id == "" {
 		return nil
 	}
-	id := g.view[idx].GoalID
 	c := g.client
 	return func() tea.Msg { return goalsMutatedMsg{err: c.DeleteGoal(id)} }
 }
@@ -396,6 +404,7 @@ func (g *Goals) OnEscape() bool {
 	switch g.mode {
 	case goalDetail, goalConfirmDelete:
 		g.mode = goalList
+		g.pendingDeleteID = ""
 		return true
 	case goalForm:
 		g.mode = goalList

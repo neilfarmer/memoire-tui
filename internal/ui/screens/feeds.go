@@ -48,6 +48,8 @@ type Feeds struct {
 	loadingArticle bool
 	addForm        *huh.Form
 	addURL         string
+
+	pendingDeleteID string
 }
 
 type feedsLoadedMsg struct {
@@ -183,6 +185,7 @@ func (f *Feeds) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		if m.String() == "n" || m.String() == "esc" {
 			f.mode = feedsList
+			f.pendingDeleteID = ""
 		}
 		return f, nil
 	case feedsDetail:
@@ -226,9 +229,13 @@ func (f *Feeds) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "n":
 		return f, f.startAdd()
 	case "d":
-		if f.pane == feedsPaneFeeds && len(f.feeds) > 0 {
-			f.mode = feedsConfirmDeleteFeed
+		if f.pane == feedsPaneFeeds {
+			if idx := f.feedsTbl.Cursor(); idx >= 0 && idx < len(f.feeds) {
+				f.pendingDeleteID = f.feeds[idx].FeedID
+				f.mode = feedsConfirmDeleteFeed
+			}
 		}
+		return f, nil
 	case "r", "ctrl+r":
 		return f, f.refresh()
 	}
@@ -269,11 +276,11 @@ func (f *Feeds) submitAdd() tea.Cmd {
 }
 
 func (f *Feeds) deleteFeed() tea.Cmd {
-	idx := f.feedsTbl.Cursor()
-	if idx >= len(f.feeds) {
+	id := f.pendingDeleteID
+	f.pendingDeleteID = ""
+	if id == "" {
 		return nil
 	}
-	id := f.feeds[idx].FeedID
 	c := f.client
 	return func() tea.Msg { return feedsMutatedMsg{err: c.DeleteFeed(id)} }
 }
@@ -388,6 +395,7 @@ func (f *Feeds) OnEscape() bool {
 	switch f.mode {
 	case feedsDetail, feedsConfirmDeleteFeed:
 		f.mode = feedsList
+		f.pendingDeleteID = ""
 		return true
 	case feedsAddForm:
 		f.mode = feedsList

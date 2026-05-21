@@ -50,6 +50,9 @@ type Finances struct {
 
 	form   *huh.Form
 	formIn financeFormState
+
+	pendingDeleteTab financeTab
+	pendingDeleteID  string
 }
 
 type financeFormState struct {
@@ -233,6 +236,7 @@ func (f *Finances) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		if m.String() == "n" || m.String() == "esc" {
 			f.mode = financeList
+			f.pendingDeleteID = ""
 		}
 		return f, nil
 	case financeForm:
@@ -263,9 +267,12 @@ func (f *Finances) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "e":
 		return f, f.startEdit()
 	case "d":
-		if f.tabLen() > 0 {
+		if id := f.idAtCursor(); id != "" {
+			f.pendingDeleteTab = f.tab
+			f.pendingDeleteID = id
 			f.mode = financeConfirmDelete
 		}
+		return f, nil
 	case "r", "ctrl+r":
 		return f, f.refresh()
 	}
@@ -281,18 +288,6 @@ func (f *Finances) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return f, cmd
 }
 
-func (f *Finances) tabLen() int {
-	switch f.tab {
-	case tabDebts:
-		return len(f.debts)
-	case tabIncome:
-		return len(f.incomes)
-	case tabExpenses:
-		return len(f.expenses)
-	}
-	return 0
-}
-
 func (f *Finances) cursor() int {
 	switch f.tab {
 	case tabDebts:
@@ -303,6 +298,28 @@ func (f *Finances) cursor() int {
 		return f.expensesTbl.Cursor()
 	}
 	return 0
+}
+
+func (f *Finances) idAtCursor() string {
+	idx := f.cursor()
+	if idx < 0 {
+		return ""
+	}
+	switch f.tab {
+	case tabDebts:
+		if idx < len(f.debts) {
+			return f.debts[idx].DebtID
+		}
+	case tabIncome:
+		if idx < len(f.incomes) {
+			return f.incomes[idx].IncomeID
+		}
+	case tabExpenses:
+		if idx < len(f.expenses) {
+			return f.expenses[idx].ExpenseID
+		}
+	}
+	return ""
 }
 
 func (f *Finances) startNew() tea.Cmd {
@@ -345,62 +362,75 @@ func (f *Finances) startEdit() tea.Cmd {
 }
 
 func (f *Finances) newForm() *huh.Form {
-	d := &f.formIn
 	switch f.tab {
 	case tabDebts:
-		return huh.NewForm(huh.NewGroup(
-			huh.NewInput().Title("Name").Value(&d.name).Validate(notEmpty),
-			huh.NewSelect[string]().Title("Type").Options(
-				huh.NewOption("Credit card", "credit_card"),
-				huh.NewOption("Auto loan", "auto_loan"),
-				huh.NewOption("Mortgage", "mortgage"),
-				huh.NewOption("Student loan", "student_loan"),
-				huh.NewOption("Personal loan", "personal_loan"),
-				huh.NewOption("Line of credit", "line_of_credit"),
-				huh.NewOption("Other", "other"),
-			).Value(&d.debtType),
-			huh.NewInput().Title("Balance").Value(&d.amount),
-			huh.NewInput().Title("APR (%)").Value(&d.apr),
-			huh.NewInput().Title("Monthly payment").Value(&d.monthlyPay),
-			huh.NewText().Title("Notes").Value(&d.notes).Lines(2),
-		)).WithKeyMap(components.FormKeyMap())
+		return f.newDebtForm()
 	case tabIncome:
-		return huh.NewForm(huh.NewGroup(
-			huh.NewInput().Title("Source").Value(&d.name).Validate(notEmpty),
-			huh.NewInput().Title("Amount").Value(&d.amount),
-			huh.NewSelect[string]().Title("Frequency").Options(
-				huh.NewOption("Monthly", "monthly"),
-				huh.NewOption("Biweekly", "biweekly"),
-				huh.NewOption("Weekly", "weekly"),
-				huh.NewOption("Annual", "annual"),
-			).Value(&d.frequency),
-			huh.NewText().Title("Notes").Value(&d.notes).Lines(2),
-		)).WithKeyMap(components.FormKeyMap())
+		return f.newIncomeForm()
 	case tabExpenses:
-		return huh.NewForm(huh.NewGroup(
-			huh.NewInput().Title("Name").Value(&d.name).Validate(notEmpty),
-			huh.NewSelect[string]().Title("Category").Options(
-				huh.NewOption("Housing", "housing"),
-				huh.NewOption("Utilities", "utilities"),
-				huh.NewOption("Subscriptions", "subscriptions"),
-				huh.NewOption("Insurance", "insurance"),
-				huh.NewOption("Food", "food"),
-				huh.NewOption("Transport", "transport"),
-				huh.NewOption("Healthcare", "healthcare"),
-				huh.NewOption("Other", "other"),
-			).Value(&d.category),
-			huh.NewInput().Title("Amount").Value(&d.amount),
-			huh.NewSelect[string]().Title("Frequency").Options(
-				huh.NewOption("Monthly", "monthly"),
-				huh.NewOption("Biweekly", "biweekly"),
-				huh.NewOption("Weekly", "weekly"),
-				huh.NewOption("Annual", "annual"),
-			).Value(&d.frequency),
-			huh.NewInput().Title("Due day").Value(&d.dueDay),
-			huh.NewText().Title("Notes").Value(&d.notes).Lines(2),
-		)).WithKeyMap(components.FormKeyMap())
+		return f.newExpenseForm()
 	}
 	return huh.NewForm().WithKeyMap(components.FormKeyMap())
+}
+
+func frequencyOptions() []huh.Option[string] {
+	return []huh.Option[string]{
+		huh.NewOption("Monthly", "monthly"),
+		huh.NewOption("Biweekly", "biweekly"),
+		huh.NewOption("Weekly", "weekly"),
+		huh.NewOption("Annual", "annual"),
+	}
+}
+
+func (f *Finances) newDebtForm() *huh.Form {
+	d := &f.formIn
+	return huh.NewForm(huh.NewGroup(
+		huh.NewInput().Title("Name").Value(&d.name).Validate(notEmpty),
+		huh.NewSelect[string]().Title("Type").Options(
+			huh.NewOption("Credit card", "credit_card"),
+			huh.NewOption("Auto loan", "auto_loan"),
+			huh.NewOption("Mortgage", "mortgage"),
+			huh.NewOption("Student loan", "student_loan"),
+			huh.NewOption("Personal loan", "personal_loan"),
+			huh.NewOption("Line of credit", "line_of_credit"),
+			huh.NewOption("Other", "other"),
+		).Value(&d.debtType),
+		huh.NewInput().Title("Balance").Value(&d.amount),
+		huh.NewInput().Title("APR (%)").Value(&d.apr),
+		huh.NewInput().Title("Monthly payment").Value(&d.monthlyPay),
+		huh.NewText().Title("Notes").Value(&d.notes).Lines(2),
+	)).WithKeyMap(components.FormKeyMap())
+}
+
+func (f *Finances) newIncomeForm() *huh.Form {
+	d := &f.formIn
+	return huh.NewForm(huh.NewGroup(
+		huh.NewInput().Title("Source").Value(&d.name).Validate(notEmpty),
+		huh.NewInput().Title("Amount").Value(&d.amount),
+		huh.NewSelect[string]().Title("Frequency").Options(frequencyOptions()...).Value(&d.frequency),
+		huh.NewText().Title("Notes").Value(&d.notes).Lines(2),
+	)).WithKeyMap(components.FormKeyMap())
+}
+
+func (f *Finances) newExpenseForm() *huh.Form {
+	d := &f.formIn
+	return huh.NewForm(huh.NewGroup(
+		huh.NewInput().Title("Name").Value(&d.name).Validate(notEmpty),
+		huh.NewSelect[string]().Title("Category").Options(
+			huh.NewOption("Housing", "housing"),
+			huh.NewOption("Utilities", "utilities"),
+			huh.NewOption("Subscriptions", "subscriptions"),
+			huh.NewOption("Insurance", "insurance"),
+			huh.NewOption("Food", "food"),
+			huh.NewOption("Transport", "transport"),
+			huh.NewOption("Healthcare", "healthcare"),
+			huh.NewOption("Other", "other"),
+		).Value(&d.category),
+		huh.NewInput().Title("Amount").Value(&d.amount),
+		huh.NewSelect[string]().Title("Frequency").Options(frequencyOptions()...).Value(&d.frequency),
+		huh.NewInput().Title("Due day").Value(&d.dueDay),
+		huh.NewText().Title("Notes").Value(&d.notes).Lines(2),
+	)).WithKeyMap(components.FormKeyMap())
 }
 
 func notEmpty(s string) error {
@@ -412,79 +442,82 @@ func notEmpty(s string) error {
 
 func (f *Finances) submit() tea.Cmd {
 	d := f.formIn
-	c := f.client
 	id := d.id
+	f.form = nil
+	f.mode = financeList
 	switch f.tab {
 	case tabDebts:
-		bal, _ := parseFloat(d.amount)
-		apr, _ := parseFloat(d.apr)
-		pay, _ := parseFloat(d.monthlyPay)
-		in := api.DebtInput{Name: d.name, Type: d.debtType, Balance: bal, APR: apr, MonthlyPayment: pay, Notes: d.notes}
-		f.form = nil
-		f.mode = financeList
-		return func() tea.Msg {
-			var err error
-			if id == "" {
-				_, err = c.CreateDebt(in)
-			} else {
-				_, err = c.UpdateDebt(id, in)
-			}
-			return financesMutatedMsg{err: err}
-		}
+		return f.submitDebt(id, d)
 	case tabIncome:
-		amt, _ := parseFloat(d.amount)
-		in := api.IncomeInput{Name: d.name, Amount: amt, Frequency: d.frequency, Notes: d.notes}
-		f.form = nil
-		f.mode = financeList
-		return func() tea.Msg {
-			var err error
-			if id == "" {
-				_, err = c.CreateIncome(in)
-			} else {
-				_, err = c.UpdateIncome(id, in)
-			}
-			return financesMutatedMsg{err: err}
-		}
+		return f.submitIncome(id, d)
 	case tabExpenses:
-		amt, _ := parseFloat(d.amount)
-		dueDay, _ := parseInt(d.dueDay)
-		in := api.FixedExpenseInput{Name: d.name, Category: d.category, Amount: amt, Frequency: d.frequency, DueDay: dueDay, Notes: d.notes}
-		f.form = nil
-		f.mode = financeList
-		return func() tea.Msg {
-			var err error
-			if id == "" {
-				_, err = c.CreateFixedExpense(in)
-			} else {
-				_, err = c.UpdateFixedExpense(id, in)
-			}
-			return financesMutatedMsg{err: err}
-		}
+		return f.submitExpense(id, d)
 	}
 	return nil
 }
 
-func (f *Finances) deleteSelected() tea.Cmd {
+func (f *Finances) submitDebt(id string, d financeFormState) tea.Cmd {
 	c := f.client
-	idx := f.cursor()
-	switch f.tab {
-	case tabDebts:
-		if idx >= len(f.debts) {
-			return nil
+	bal, _ := parseFloat(d.amount)
+	apr, _ := parseFloat(d.apr)
+	pay, _ := parseFloat(d.monthlyPay)
+	in := api.DebtInput{Name: d.name, Type: d.debtType, Balance: bal, APR: apr, MonthlyPayment: pay, Notes: d.notes}
+	return func() tea.Msg {
+		var err error
+		if id == "" {
+			_, err = c.CreateDebt(in)
+		} else {
+			_, err = c.UpdateDebt(id, in)
 		}
-		id := f.debts[idx].DebtID
+		return financesMutatedMsg{err: err}
+	}
+}
+
+func (f *Finances) submitIncome(id string, d financeFormState) tea.Cmd {
+	c := f.client
+	amt, _ := parseFloat(d.amount)
+	in := api.IncomeInput{Name: d.name, Amount: amt, Frequency: d.frequency, Notes: d.notes}
+	return func() tea.Msg {
+		var err error
+		if id == "" {
+			_, err = c.CreateIncome(in)
+		} else {
+			_, err = c.UpdateIncome(id, in)
+		}
+		return financesMutatedMsg{err: err}
+	}
+}
+
+func (f *Finances) submitExpense(id string, d financeFormState) tea.Cmd {
+	c := f.client
+	amt, _ := parseFloat(d.amount)
+	dueDay, _ := parseInt(d.dueDay)
+	in := api.FixedExpenseInput{Name: d.name, Category: d.category, Amount: amt, Frequency: d.frequency, DueDay: dueDay, Notes: d.notes}
+	return func() tea.Msg {
+		var err error
+		if id == "" {
+			_, err = c.CreateFixedExpense(in)
+		} else {
+			_, err = c.UpdateFixedExpense(id, in)
+		}
+		return financesMutatedMsg{err: err}
+	}
+}
+
+func (f *Finances) deleteSelected() tea.Cmd {
+	id := f.pendingDeleteID
+	tab := f.pendingDeleteTab
+	f.pendingDeleteID = ""
+	if id == "" {
+		return nil
+	}
+	c := f.client
+	switch tab {
+	case tabDebts:
 		return func() tea.Msg { return financesMutatedMsg{err: c.DeleteDebt(id)} }
 	case tabIncome:
-		if idx >= len(f.incomes) {
-			return nil
-		}
-		id := f.incomes[idx].IncomeID
 		return func() tea.Msg { return financesMutatedMsg{err: c.DeleteIncome(id)} }
 	case tabExpenses:
-		if idx >= len(f.expenses) {
-			return nil
-		}
-		id := f.expenses[idx].ExpenseID
 		return func() tea.Msg { return financesMutatedMsg{err: c.DeleteFixedExpense(id)} }
 	}
 	return nil
@@ -589,6 +622,7 @@ func (f *Finances) OnEscape() bool {
 		return true
 	case financeConfirmDelete:
 		f.mode = financeList
+		f.pendingDeleteID = ""
 		return true
 	}
 	return false
