@@ -273,16 +273,22 @@ func (a *Assistant) currentConvTitle() string {
 }
 
 func (a *Assistant) View() string {
+	// Layout budget per row:
+	//   header(2) + body(messages_box + input_box) = a.height
+	// where messages_box = viewHeight + 2 border and input_box = 5
+	// (textarea Height(3) + 2 border). The status hints live in the
+	// app's global status bar so the screen doesn't need its own.
 	const (
-		convoWidth  = 30
-		headerLines = 3 // header bar + spacer + bottom rule
-		inputLines  = 5 // input box (with border) + status line + spacer
+		convoWidth         = 30
+		headerLines        = 2
+		inputBoxLines      = 5
+		messagesBorderLine = 2
 	)
 	rightWidth := a.width - convoWidth - 3
 	if rightWidth < 30 {
 		rightWidth = 30
 	}
-	viewHeight := a.height - headerLines - inputLines
+	viewHeight := a.height - headerLines - inputBoxLines - messagesBorderLine
 	if viewHeight < 5 {
 		viewHeight = 5
 	}
@@ -294,9 +300,8 @@ func (a *Assistant) View() string {
 	convos := a.renderConvos(convoWidth, a.height-headerLines)
 	messages := a.renderMessages(rightWidth, viewHeight)
 	input := a.renderInput(rightWidth)
-	hints := a.renderHints(rightWidth)
 
-	right := lipgloss.JoinVertical(lipgloss.Left, messages, input, hints)
+	right := lipgloss.JoinVertical(lipgloss.Left, messages, input)
 	body := lipgloss.JoinHorizontal(lipgloss.Top, convos, "  ", right)
 	return lipgloss.JoinVertical(lipgloss.Left, header, body)
 }
@@ -370,23 +375,22 @@ func (a *Assistant) renderConvos(width, height int) string {
 }
 
 func (a *Assistant) renderMessages(width, height int) string {
-	if len(a.messages) == 0 {
-		empty := lipgloss.JoinVertical(lipgloss.Center,
-			styles.Heading.Render("Start a conversation"),
-			"",
-			styles.MutedText.Render("Type a message below and press ctrl+j to send."),
-			styles.MutedText.Render("Press tab to switch panes, m to toggle the model."),
-		)
-		placed := lipgloss.Place(width-2, height, lipgloss.Center, lipgloss.Center, empty)
-		box := styles.Box
-		if a.pane == assistantPaneMessages {
-			box = styles.BoxFocused
-		}
-		return box.Width(width).Height(height).Render(placed)
-	}
 	box := styles.Box
 	if a.pane == assistantPaneMessages {
 		box = styles.BoxFocused
+	}
+	if len(a.messages) == 0 {
+		// Empty state must fit inside the box's inner width
+		// (width - 4: -2 border, -2 padding) on a single line each.
+		// Anything wider forces lipgloss to wrap and the rendered
+		// height grows past the budget, clipping the input box.
+		empty := lipgloss.JoinVertical(lipgloss.Center,
+			styles.Heading.Render("Start a conversation"),
+			"",
+			styles.MutedText.Render("type below • ctrl+j sends"),
+		)
+		inner := lipgloss.Place(width-4, height, lipgloss.Center, lipgloss.Center, empty)
+		return box.Width(width).Height(height).Render(inner)
 	}
 	return box.Width(width).Height(height).Render(a.view.View())
 }
@@ -400,21 +404,6 @@ func (a *Assistant) renderInput(width int) string {
 	prompt := lipgloss.NewStyle().Foreground(styles.Primary).Bold(true).Render("> ")
 	body := lipgloss.JoinHorizontal(lipgloss.Top, prompt, a.input.View())
 	return box.Width(width).Render(body)
-}
-
-func (a *Assistant) renderHints(width int) string {
-	hints := []string{
-		styles.KeyHint("ctrl+j", "send"),
-		styles.KeyHint("tab", "switch pane"),
-		styles.KeyHint("ctrl+n", "new chat"),
-		styles.KeyHint("ctrl+l", "clear"),
-	}
-	if a.pane != assistantPaneInput {
-		hints = append(hints, styles.KeyHint("m", "toggle model"))
-	}
-	hints = append(hints, styles.KeyHint(":", "more"))
-	line := strings.Join(hints, "   ")
-	return lipgloss.NewStyle().Width(width).Render(line)
 }
 
 func relativeTime(s string) string {
