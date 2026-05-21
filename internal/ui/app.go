@@ -290,12 +290,15 @@ func (a *App) View() string {
 	if a.width == 0 || a.height == 0 {
 		return components.Splash(0, 0, "loading…")
 	}
+	// All inner content (header, body, overlays) sits inside an outer
+	// 1-cell rounded border, so the usable area is shrunk by 2.
+	innerW, innerH := a.width-2, a.height-2
 	header := components.Header{
 		Section:   SidebarLabels[a.current],
 		Connected: a.connected,
 		APIHost:   a.apiHost,
 		Auth:      "PAT",
-		Width:     a.width,
+		Width:     innerW,
 	}.View()
 
 	items := make([]components.SidebarItem, 0, len(SidebarOrder))
@@ -345,23 +348,28 @@ func (a *App) View() string {
 		Screen: SidebarLabels[a.current],
 		Flash:  a.flash,
 		Hints:  hints,
-		Width:  a.width,
+		Width:  innerW,
 	}.View()
 
 	body := lipgloss.JoinHorizontal(lipgloss.Top, side, contentBox)
 	out := lipgloss.JoinVertical(lipgloss.Left, header, body, status)
 
-	if a.helpOpen {
-		return components.HelpView(a.width, a.height, a.helpSections(), a.helpOrder())
+	inner := out
+	switch {
+	case a.helpOpen:
+		inner = components.HelpView(innerW, innerH, a.helpSections(), a.helpOrder())
+	case a.paletteOpen && a.palette != nil:
+		a.palette.SetSize(innerW, innerH)
+		inner = a.palette.View()
+	case a.quitConfirm:
+		inner = components.ConfirmView("Quit memoire?", innerW, innerH)
 	}
-	if a.paletteOpen && a.palette != nil {
-		a.palette.SetSize(a.width, a.height)
-		return a.palette.View()
-	}
-	if a.quitConfirm {
-		return components.ConfirmView("Quit memoire?", a.width, a.height)
-	}
-	return out
+	return lipgloss.NewStyle().
+		Border(lipgloss.DoubleBorder()).
+		BorderForeground(styles.Primary).
+		Width(innerW).
+		Height(innerH).
+		Render(inner)
 }
 
 func (a *App) helpSections() map[string][]components.HelpEntry {
@@ -460,7 +468,8 @@ func sidebarIndex(s Screen) int {
 }
 
 func (a *App) contentWidth() int {
-	w := a.width - 26 // sidebar(24) + 2 padding
+	// sidebar(24 inside + 2 box border) + outer chrome border(2) = 28
+	w := a.width - 28
 	if w < 40 {
 		w = 40
 	}
@@ -468,7 +477,8 @@ func (a *App) contentWidth() int {
 }
 
 func (a *App) contentHeight() int {
-	h := a.height - 5 // header(2) + statusbar(2) + spacing(1)
+	// header(2) + statusbar(2) + spacing(1) + outer chrome border(2) = 7
+	h := a.height - 7
 	if h < 10 {
 		h = 10
 	}
