@@ -1,6 +1,7 @@
 package screens
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -46,6 +47,8 @@ type Notes struct {
 	formData       noteFormState
 	folderForm     *huh.Form
 	folderFormName string
+
+	pendingDeleteFolderID string
 }
 
 type noteFormState struct {
@@ -115,16 +118,18 @@ func (n *Notes) refresh() tea.Cmd {
 	c := n.client
 	return func() tea.Msg {
 		var msg notesLoadedMsg
+		var errs []error
 		if f, err := c.ListNoteFolders(); err == nil {
 			msg.folders = f
 		} else {
-			msg.err = err
+			errs = append(errs, err)
 		}
 		if notes, err := c.ListNotes(""); err == nil {
 			msg.notes = notes
-		} else if msg.err == nil {
-			msg.err = err
+		} else {
+			errs = append(errs, err)
 		}
+		msg.err = errors.Join(errs...)
 		return msg
 	}
 }
@@ -182,24 +187,10 @@ func (n *Notes) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return n.handleKey(m)
 	}
 	if n.mode == noteForm && n.form != nil {
-		f, cmd := n.form.Update(msg)
-		if ff, ok := f.(*huh.Form); ok {
-			n.form = ff
-		}
-		if n.form.State == huh.StateCompleted {
-			return n, n.submitForm()
-		}
-		return n, cmd
+		return n, updateForm(&n.form, msg, func() { n.mode = noteList }, n.submitForm)
 	}
 	if n.mode == noteFolderForm && n.folderForm != nil {
-		f, cmd := n.folderForm.Update(msg)
-		if ff, ok := f.(*huh.Form); ok {
-			n.folderForm = ff
-		}
-		if n.folderForm.State == huh.StateCompleted {
-			return n, n.submitFolder()
-		}
-		return n, cmd
+		return n, updateForm(&n.folderForm, msg, func() { n.mode = noteFolderList }, n.submitFolder)
 	}
 	if n.mode == noteList {
 		var cmd tea.Cmd
@@ -232,7 +223,7 @@ func (n *Notes) refilter() {
 			shortDate(x.UpdatedAt),
 		})
 	}
-	n.tbl.SetRows(components.Stripe(rows, noteCols(n.width-6)))
+	n.tbl.SetRows(rows)
 	frows := make([]components.Row, 0, len(n.folders)+1)
 	// "All notes" pseudo-folder lets users browse without filtering.
 	frows = append(frows, components.Row{"All notes", fmt.Sprintf("%d", len(n.notes))})
@@ -245,7 +236,7 @@ func (n *Notes) refilter() {
 		}
 		frows = append(frows, components.Row{f.Name, fmt.Sprintf("%d", count)})
 	}
-	n.folderTbl.SetRows(components.Stripe(frows, folderCols(n.width-6)))
+	n.folderTbl.SetRows(frows)
 }
 
 func (n *Notes) folderName(id string) string {
@@ -263,22 +254,18 @@ func (n *Notes) folderName(id string) string {
 func (n *Notes) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch n.mode {
 	case noteConfirmDelete:
-		if m.String() == "y" {
+		return n, handleConfirmDelete(m.String(), func() tea.Cmd {
 			n.mode = noteList
-			return n, n.deleteCurrent()
-		}
-		if m.String() == "n" || m.String() == "esc" {
-			n.mode = noteList
-		}
-		return n, nil
+			return n.deleteCurrent()
+		}, func() { n.mode = noteList })
 	case noteConfirmDeleteFolder:
-		if m.String() == "y" {
-			return n, n.deleteFolder()
-		}
-		if m.String() == "n" || m.String() == "esc" {
+		return n, handleConfirmDelete(m.String(), func() tea.Cmd {
 			n.mode = noteFolderList
-		}
-		return n, nil
+			return n.deleteFolder()
+		}, func() {
+			n.mode = noteFolderList
+			n.pendingDeleteFolderID = ""
+		})
 	case noteDetail:
 		switch m.String() {
 		case "esc":
@@ -290,48 +277,27 @@ func (n *Notes) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return n, nil
 	case noteForm:
-		if m.String() == "esc" {
-			n.mode = noteList
-			n.form = nil
-			return n, nil
-		}
-		if m.String() == "ctrl+s" {
-			return n, n.submitForm()
-		}
 		if m.String() == "ctrl+e" {
 			return n, components.EditExternal(n.formData.body, ".md")
 		}
-		f, cmd := n.form.Update(m)
-		if ff, ok := f.(*huh.Form); ok {
-			n.form = ff
-		}
-		if n.form.State == huh.StateCompleted {
-			return n, n.submitForm()
-		}
-		return n, cmd
+		return n, updateForm(&n.form, m, func() { n.mode = noteList }, n.submitForm)
 	case noteFolderForm:
-		if m.String() == "esc" {
-			n.mode = noteFolderList
-			n.folderForm = nil
-			return n, nil
-		}
-		f, cmd := n.folderForm.Update(m)
-		if ff, ok := f.(*huh.Form); ok {
-			n.folderForm = ff
-		}
-		if n.folderForm.State == huh.StateCompleted {
-			return n, n.submitFolder()
-		}
-		return n, cmd
+		return n, updateForm(&n.folderForm, m, func() { n.mode = noteFolderList }, n.submitFolder)
 	case noteFolderList:
 		switch m.String() {
 		case "n":
 			return n, n.startFolderForm()
 		case "d":
 			// Cursor 0 is the synthetic "All notes" entry — never deletable.
-			if n.folderTbl.Cursor() > 0 && len(n.folders) > 0 {
+			// Capture the folder ID now: bubbles/table treats 'd' as
+			// HalfPageDown and would otherwise move the cursor before the
+			// confirm prompt reads it.
+			idx := n.folderTbl.Cursor()
+			if idx > 0 && idx-1 < len(n.folders) {
+				n.pendingDeleteFolderID = n.folders[idx-1].FolderID
 				n.mode = noteConfirmDeleteFolder
 			}
+			return n, nil
 		case "enter":
 			idx := n.folderTbl.Cursor()
 			if idx == 0 {
@@ -436,12 +402,7 @@ func (n *Notes) newForm(title string) *huh.Form {
 	d := &n.formData
 	return huh.NewForm(
 		huh.NewGroup(
-			huh.NewInput().Title("Title").Value(&d.title).Validate(func(s string) error {
-				if strings.TrimSpace(s) == "" {
-					return fmt.Errorf("required")
-				}
-				return nil
-			}),
+			huh.NewInput().Title("Title").Value(&d.title).Validate(notEmpty),
 			huh.NewText().Title("Body (markdown — ctrl+e for $EDITOR)").Value(&d.body).Lines(8),
 			huh.NewInput().Title("Tags (comma separated)").Value(&d.tags),
 		),
@@ -498,11 +459,11 @@ func (n *Notes) submitFolder() tea.Cmd {
 }
 
 func (n *Notes) deleteFolder() tea.Cmd {
-	idx := n.folderTbl.Cursor()
-	if idx >= len(n.folders) {
+	id := n.pendingDeleteFolderID
+	n.pendingDeleteFolderID = ""
+	if id == "" {
 		return nil
 	}
-	id := n.folders[idx].FolderID
 	c := n.client
 	return func() tea.Msg { return noteMutatedMsg{err: c.DeleteNoteFolder(id)} }
 }
@@ -540,7 +501,7 @@ func (n *Notes) View() string {
 	if n.err != nil {
 		errLine = styles.DangerText.Render("error: " + n.err.Error())
 	}
-	n.tbl.SetColumns(components.WithStripeColumn(noteCols(n.width - 6)))
+	n.tbl.SetColumns(noteCols(n.width - 6))
 	if n.height-10 > 0 {
 		n.tbl.SetHeight(n.height - 10)
 	}
@@ -588,7 +549,7 @@ func (n *Notes) detailView() string {
 
 func (n *Notes) folderListView() string {
 	header := components.Crumbs("Notes", "Folders")
-	n.folderTbl.SetColumns(components.WithStripeColumn(folderCols(n.width - 6)))
+	n.folderTbl.SetColumns(folderCols(n.width - 6))
 	if n.height-8 > 0 {
 		n.folderTbl.SetHeight(n.height - 8)
 	}
@@ -627,8 +588,8 @@ func (n *Notes) Help() []components.HelpEntry {
 }
 func (n *Notes) SetSize(w, h int) {
 	n.width, n.height = w, h
-	n.tbl.SetColumns(components.WithStripeColumn(noteCols(w - 6)))
-	n.folderTbl.SetColumns(components.WithStripeColumn(folderCols(w - 6)))
+	n.tbl.SetColumns(noteCols(w - 6))
+	n.folderTbl.SetColumns(folderCols(w - 6))
 	if h-8 > 0 {
 		n.tbl.SetHeight(h - 8)
 		n.folderTbl.SetHeight(h - 8)
@@ -652,6 +613,7 @@ func (n *Notes) OnEscape() bool {
 		return true
 	case noteConfirmDeleteFolder:
 		n.mode = noteFolderList
+		n.pendingDeleteFolderID = ""
 		return true
 	case noteForm:
 		n.mode = noteList

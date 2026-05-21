@@ -2,6 +2,7 @@ package ui
 
 import (
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -254,32 +255,19 @@ func (a *App) currentScreenIsEditing() bool {
 
 // isTerminalNoiseKey reports whether a tea KeyMsg.String() looks like a
 // terminal OSC response or other escape-leakage rather than user input.
+// The leaked OSC color-query reply looks like "]11;rgb:1c1c/1c1c/1c1c" —
+// an introducer (']' or '[') followed immediately by digits, often with
+// ";rgb:" embedded. Bare bracket keys ('[' or ']') must pass through
+// untouched so users can type them.
 func isTerminalNoiseKey(k string) bool {
 	if k == "" {
 		return false
 	}
-	if k[0] == ']' || k[0] == '[' {
+	if strings.Contains(k, ";rgb:") {
 		return true
 	}
-	for _, marker := range []string{";rgb:", "rgb:", "]11", "alt+]", "alt+\\"} {
-		if containsStr(k, marker) {
-			return true
-		}
-	}
-	return false
-}
-
-func containsStr(s, sub string) bool {
-	if len(sub) == 0 {
+	if len(k) >= 2 && (k[0] == ']' || k[0] == '[') && k[1] >= '0' && k[1] <= '9' {
 		return true
-	}
-	if len(sub) > len(s) {
-		return false
-	}
-	for i := 0; i+len(sub) <= len(s); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
 	}
 	return false
 }

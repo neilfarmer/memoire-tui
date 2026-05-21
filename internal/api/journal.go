@@ -9,13 +9,24 @@ type JournalSummary struct {
 }
 
 type JournalEntry struct {
-	EntryDate string   `json:"entry_date"`
-	Title     string   `json:"title,omitempty"`
+	EntryDate string `json:"entry_date"`
+	Title     string `json:"title,omitempty"`
+	// The API has historically returned the entry text under either
+	// "content" or "body". Keep both DTO fields and use Text() to read.
 	Content   string   `json:"content,omitempty"`
 	Body      string   `json:"body,omitempty"`
 	Mood      string   `json:"mood,omitempty"`
 	Tags      []string `json:"tags,omitempty"`
 	UpdatedAt string   `json:"updated_at,omitempty"`
+}
+
+// Text returns the entry body, preferring Content over Body when both
+// are populated.
+func (e JournalEntry) Text() string {
+	if e.Content != "" {
+		return e.Content
+	}
+	return e.Body
 }
 
 type JournalInput struct {
@@ -36,15 +47,11 @@ func (c *Client) ListJournal(query string) ([]JournalSummary, error) {
 }
 
 func (c *Client) GetJournal(date string) (JournalEntry, error) {
-	var out JournalEntry
-	return out, c.Get("/journal/"+url.PathEscape(date), &out)
+	return GetOne[JournalEntry](c, "/journal/"+url.PathEscape(date))
 }
-
 func (c *Client) UpsertJournal(date string, in JournalInput) (JournalEntry, error) {
-	var out JournalEntry
-	return out, c.Put("/journal/"+url.PathEscape(date), in, &out)
+	return PutOne[JournalEntry](c, "/journal/"+url.PathEscape(date), in)
 }
-
 func (c *Client) DeleteJournal(date string) error {
 	return c.Delete("/journal/" + url.PathEscape(date))
 }

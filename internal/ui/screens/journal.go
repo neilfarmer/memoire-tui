@@ -120,14 +120,7 @@ func (j *Journal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return j.handleKey(m)
 	}
 	if j.mode == journalForm && j.form != nil {
-		f, cmd := j.form.Update(msg)
-		if ff, ok := f.(*huh.Form); ok {
-			j.form = ff
-		}
-		if j.form.State == huh.StateCompleted {
-			return j, j.submit()
-		}
-		return j, cmd
+		return j, updateForm(&j.form, msg, func() { j.mode = journalView }, j.submit)
 	}
 	return j, nil
 }
@@ -135,33 +128,12 @@ func (j *Journal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (j *Journal) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch j.mode {
 	case journalForm:
-		if m.String() == "esc" {
-			j.mode = journalView
-			j.form = nil
-			return j, nil
-		}
-		if m.String() == "ctrl+s" {
-			return j, j.submit()
-		}
 		if m.String() == "ctrl+e" {
 			return j, components.EditExternal(j.formData.body, ".md")
 		}
-		f, cmd := j.form.Update(m)
-		if ff, ok := f.(*huh.Form); ok {
-			j.form = ff
-		}
-		if j.form.State == huh.StateCompleted {
-			return j, j.submit()
-		}
-		return j, cmd
+		return j, updateForm(&j.form, m, func() { j.mode = journalView }, j.submit)
 	case journalConfirmDelete:
-		if m.String() == "y" {
-			return j, j.deleteEntry()
-		}
-		if m.String() == "n" || m.String() == "esc" {
-			j.mode = journalView
-		}
-		return j, nil
+		return j, handleConfirmDelete(m.String(), j.deleteEntry, func() { j.mode = journalView })
 	}
 	switch m.String() {
 	case "n", "right", "l":
@@ -187,7 +159,7 @@ func (j *Journal) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "e":
 		return j, j.startEdit()
 	case "d":
-		if j.current.Content != "" || j.current.Body != "" {
+		if j.current.Text() != "" {
 			j.mode = journalConfirmDelete
 		}
 	case "r", "ctrl+r":
@@ -199,7 +171,7 @@ func (j *Journal) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (j *Journal) startEdit() tea.Cmd {
 	j.formData = journalFormState{
 		title: j.current.Title,
-		body:  firstNonEmpty(j.current.Content, j.current.Body),
+		body:  j.current.Text(),
 		mood:  j.current.Mood,
 		tags:  strings.Join(j.current.Tags, ", "),
 	}
@@ -219,15 +191,6 @@ func (j *Journal) startEdit() tea.Cmd {
 	)).WithKeyMap(components.FormKeyMap())
 	j.mode = journalForm
 	return j.form.Init()
-}
-
-func firstNonEmpty(opts ...string) string {
-	for _, s := range opts {
-		if s != "" {
-			return s
-		}
-	}
-	return ""
 }
 
 func (j *Journal) submit() tea.Cmd {
@@ -270,7 +233,7 @@ func (j *Journal) View() string {
 	if !j.loaded {
 		body = styles.MutedText.Render("Loading...")
 	} else {
-		content := firstNonEmpty(j.current.Content, j.current.Body)
+		content := j.current.Text()
 		if content == "" {
 			body = styles.MutedText.Render(fmt.Sprintf("No entry for %s. Press e to write one.", j.cursor.Format("2006-01-02")))
 		} else {

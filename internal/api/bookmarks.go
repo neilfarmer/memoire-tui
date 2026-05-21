@@ -35,20 +35,14 @@ func (c *Client) ListBookmarks(query, tag string) ([]Bookmark, error) {
 }
 
 func (c *Client) GetBookmark(id string) (Bookmark, error) {
-	var out Bookmark
-	return out, c.Get("/bookmarks/"+url.PathEscape(id), &out)
+	return GetOne[Bookmark](c, "/bookmarks/"+url.PathEscape(id))
 }
-
 func (c *Client) CreateBookmark(in BookmarkInput) (Bookmark, error) {
-	var out Bookmark
-	return out, c.Post("/bookmarks", in, &out)
+	return PostOne[Bookmark](c, "/bookmarks", in)
 }
-
 func (c *Client) UpdateBookmark(id string, in BookmarkInput) (Bookmark, error) {
-	var out Bookmark
-	return out, c.Put("/bookmarks/"+url.PathEscape(id), in, &out)
+	return PutOne[Bookmark](c, "/bookmarks/"+url.PathEscape(id), in)
 }
-
 func (c *Client) DeleteBookmark(id string) error {
 	return c.Delete("/bookmarks/" + url.PathEscape(id))
 }

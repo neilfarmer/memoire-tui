@@ -63,3 +63,27 @@ func min(a, b int) int {
 	}
 	return b
 }
+
+func TestIsTerminalNoiseKey(t *testing.T) {
+	cases := []struct {
+		in   string
+		want bool
+		why  string
+	}{
+		{"", false, "empty"},
+		{"[", false, "bare left bracket — user typed it"},
+		{"]", false, "bare right bracket — user typed it"},
+		{"a", false, "letter"},
+		{"ctrl+s", false, "modifier combo"},
+		{"alt+]", false, "real alt-bracket combo"},
+		{"]11;rgb:1c1c/1c1c/1c1c", true, "OSC 11 background color reply"},
+		{"]10;rgb:ffff/ffff/ffff", true, "OSC 10 foreground reply"},
+		{"[2~", true, "CSI sequence"},
+		{"foo;rgb:bar", true, "embedded rgb payload"},
+	}
+	for _, c := range cases {
+		if got := isTerminalNoiseKey(c.in); got != c.want {
+			t.Errorf("isTerminalNoiseKey(%q) = %v, want %v (%s)", c.in, got, c.want, c.why)
+		}
+	}
+}

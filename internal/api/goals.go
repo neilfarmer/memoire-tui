@@ -24,26 +24,12 @@ type GoalInput struct {
 	Progress    int    `json:"progress,omitempty"`
 }
 
-func (c *Client) ListGoals() ([]Goal, error) {
-	var out []Goal
-	return out, c.Get("/goals", &out)
-}
-
+func (c *Client) ListGoals() ([]Goal, error) { return GetList[Goal](c, "/goals") }
 func (c *Client) GetGoal(id string) (Goal, error) {
-	var out Goal
-	return out, c.Get("/goals/"+url.PathEscape(id), &out)
+	return GetOne[Goal](c, "/goals/"+url.PathEscape(id))
 }
-
-func (c *Client) CreateGoal(in GoalInput) (Goal, error) {
-	var out Goal
-	return out, c.Post("/goals", in, &out)
-}
-
+func (c *Client) CreateGoal(in GoalInput) (Goal, error) { return PostOne[Goal](c, "/goals", in) }
 func (c *Client) UpdateGoal(id string, in GoalInput) (Goal, error) {
-	var out Goal
-	return out, c.Put("/goals/"+url.PathEscape(id), in, &out)
+	return PutOne[Goal](c, "/goals/"+url.PathEscape(id), in)
 }
-
-func (c *Client) DeleteGoal(id string) error {
-	return c.Delete("/goals/" + url.PathEscape(id))
-}
+func (c *Client) DeleteGoal(id string) error { return c.Delete("/goals/" + url.PathEscape(id)) }

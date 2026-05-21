@@ -20,6 +20,19 @@ type Client struct {
 	BaseURL string
 	PAT     string
 	HTTP    *http.Client
+	// Ctx is the default context for non-DoContext calls. Nil means
+	// context.Background(). Use WithContext to derive a request-scoped
+	// client tied to a screen or other lifecycle.
+	Ctx context.Context
+}
+
+// WithContext returns a shallow copy of c bound to ctx so subsequent
+// non-DoContext calls are cancellable when ctx is. Useful for screens
+// that need to abort in-flight requests on teardown.
+func (c *Client) WithContext(ctx context.Context) *Client {
+	cp := *c
+	cp.Ctx = ctx
+	return &cp
 }
 
 // New builds a Client with a default 30s timeout.
@@ -73,7 +86,11 @@ func (c *Client) Do(method, path string, body, out any) error {
 
 // DoQuery is like Do but appends url.Values to the request URL.
 func (c *Client) DoQuery(method, path string, q url.Values, body, out any) error {
-	return c.DoContext(context.Background(), method, path, q, body, out)
+	ctx := c.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return c.DoContext(ctx, method, path, q, body, out)
 }
 
 // DoContext is the cancellable form. Callers that need to abort a request

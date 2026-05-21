@@ -34,29 +34,15 @@ type TaskInput struct {
 	RecurrenceRule  any      `json:"recurrence_rule,omitempty"`
 }
 
-func (c *Client) ListTasks() ([]Task, error) {
-	var out []Task
-	return out, c.Get("/tasks", &out)
-}
-
+func (c *Client) ListTasks() ([]Task, error) { return GetList[Task](c, "/tasks") }
 func (c *Client) GetTask(id string) (Task, error) {
-	var out Task
-	return out, c.Get("/tasks/"+url.PathEscape(id), &out)
+	return GetOne[Task](c, "/tasks/"+url.PathEscape(id))
 }
-
-func (c *Client) CreateTask(in TaskInput) (Task, error) {
-	var out Task
-	return out, c.Post("/tasks", in, &out)
-}
-
+func (c *Client) CreateTask(in TaskInput) (Task, error) { return PostOne[Task](c, "/tasks", in) }
 func (c *Client) UpdateTask(id string, in TaskInput) (Task, error) {
-	var out Task
-	return out, c.Put("/tasks/"+url.PathEscape(id), in, &out)
+	return PutOne[Task](c, "/tasks/"+url.PathEscape(id), in)
 }
-
-func (c *Client) DeleteTask(id string) error {
-	return c.Delete("/tasks/" + url.PathEscape(id))
-}
+func (c *Client) DeleteTask(id string) error { return c.Delete("/tasks/" + url.PathEscape(id)) }
 
 func (c *Client) TasksCalendar(from, to string) ([]Task, error) {
 	q := url.Values{}
@@ -76,6 +62,5 @@ type AutoScheduleResult struct {
 }
 
 func (c *Client) AutoScheduleTasks(in map[string]any) (AutoScheduleResult, error) {
-	var out AutoScheduleResult
-	return out, c.Post("/tasks/auto-schedule", in, &out)
+	return PostOne[AutoScheduleResult](c, "/tasks/auto-schedule", in)
 }

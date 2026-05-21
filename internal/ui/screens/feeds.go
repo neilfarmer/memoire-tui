@@ -1,6 +1,7 @@
 package screens
 
 import (
+	"errors"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -95,14 +96,18 @@ func (f *Feeds) refresh() tea.Cmd {
 	c := f.client
 	return func() tea.Msg {
 		var msg feedsLoadedMsg
+		var errs []error
 		if feeds, err := c.ListFeeds(); err == nil {
 			msg.feeds = feeds
 		} else {
-			msg.err = err
+			errs = append(errs, err)
 		}
 		if arts, err := c.ListFeedArticles(false); err == nil {
 			msg.articles = arts
+		} else {
+			errs = append(errs, err)
 		}
+		msg.err = errors.Join(errs...)
 		return msg
 	}
 }
@@ -133,14 +138,7 @@ func (f *Feeds) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return f.handleKey(m)
 	}
 	if f.mode == feedsAddForm && f.addForm != nil {
-		af, cmd := f.addForm.Update(msg)
-		if x, ok := af.(*huh.Form); ok {
-			f.addForm = x
-		}
-		if f.addForm.State == huh.StateCompleted {
-			return f, f.submitAdd()
-		}
-		return f, cmd
+		return f, updateForm(&f.addForm, msg, func() { f.mode = feedsList }, f.submitAdd)
 	}
 	if f.mode == feedsList {
 		var cmd tea.Cmd
@@ -163,7 +161,7 @@ func (f *Feeds) refreshRows() {
 		}
 		frows = append(frows, components.Row{truncate(title, 28)})
 	}
-	f.feedsTbl.SetRows(components.Stripe(frows, feedTblCols()))
+	f.feedsTbl.SetRows(frows)
 	arows := make([]components.Row, 0, len(f.articles))
 	for _, a := range f.articles {
 		mark := " "
@@ -174,20 +172,16 @@ func (f *Feeds) refreshRows() {
 			mark, truncate(a.PubDate, 12), truncate(a.SourceFeed, 18), a.Title,
 		})
 	}
-	f.articlesTbl.SetRows(components.Stripe(arows, articleTblCols(f.width-32)))
+	f.articlesTbl.SetRows(arows)
 }
 
 func (f *Feeds) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch f.mode {
 	case feedsConfirmDeleteFeed:
-		if m.String() == "y" {
-			return f, f.deleteFeed()
-		}
-		if m.String() == "n" || m.String() == "esc" {
+		return f, handleConfirmDelete(m.String(), f.deleteFeed, func() {
 			f.mode = feedsList
 			f.pendingDeleteID = ""
-		}
-		return f, nil
+		})
 	case feedsDetail:
 		switch m.String() {
 		case "esc":
@@ -201,11 +195,7 @@ func (f *Feeds) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return f, nil
 	case feedsAddForm:
-		if m.String() == "esc" {
-			f.mode = feedsList
-			f.addForm = nil
-		}
-		return f, nil
+		return f, updateForm(&f.addForm, m, func() { f.mode = feedsList }, f.submitAdd)
 	}
 	switch m.String() {
 	case "tab":
@@ -330,7 +320,7 @@ func (f *Feeds) View() string {
 		f.feedsTbl.SetHeight(f.height - 6)
 		f.articlesTbl.SetHeight(f.height - 6)
 	}
-	f.articlesTbl.SetColumns(components.WithStripeColumn(articleTblCols(rightWidth)))
+	f.articlesTbl.SetColumns(articleTblCols(rightWidth))
 	feedsHints := []string{
 		styles.KeyHint("tab", "switch"),
 		styles.KeyHint("n", "add"),

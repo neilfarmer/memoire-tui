@@ -10,16 +10,8 @@ type Token struct {
 	Token      string `json:"token,omitempty"`
 }
 
-func (c *Client) ListTokens() ([]Token, error) {
-	var out []Token
-	return out, c.Get("/tokens", &out)
-}
-
+func (c *Client) ListTokens() ([]Token, error) { return GetList[Token](c, "/tokens") }
 func (c *Client) CreateToken(name string) (Token, error) {
-	var out Token
-	return out, c.Post("/tokens", map[string]string{"name": name}, &out)
+	return PostOne[Token](c, "/tokens", map[string]string{"name": name})
 }
-
-func (c *Client) DeleteToken(id string) error {
-	return c.Delete("/tokens/" + url.PathEscape(id))
-}
+func (c *Client) DeleteToken(id string) error { return c.Delete("/tokens/" + url.PathEscape(id)) }

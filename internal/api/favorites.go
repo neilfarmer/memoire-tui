@@ -28,21 +28,13 @@ type FavoriteInput struct {
 	Tags        []string `json:"tags,omitempty"`
 }
 
-func (c *Client) ListFavorites() ([]Favorite, error) {
-	var out []Favorite
-	return out, c.Get("/favorites", &out)
-}
-
+func (c *Client) ListFavorites() ([]Favorite, error) { return GetList[Favorite](c, "/favorites") }
 func (c *Client) CreateFavorite(in FavoriteInput) (Favorite, error) {
-	var out Favorite
-	return out, c.Post("/favorites", in, &out)
+	return PostOne[Favorite](c, "/favorites", in)
 }
-
 func (c *Client) UpdateFavoriteTags(id string, tags []string) (Favorite, error) {
-	var out Favorite
-	return out, c.Patch("/favorites/"+url.PathEscape(id), map[string]any{"tags": tags}, &out)
+	return PatchOne[Favorite](c, "/favorites/"+url.PathEscape(id), map[string]any{"tags": tags})
 }
-
 func (c *Client) DeleteFavorite(id string) error {
 	return c.Delete("/favorites/" + url.PathEscape(id))
 }

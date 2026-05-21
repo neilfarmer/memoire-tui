@@ -67,21 +67,13 @@ type RecentExercise struct {
 	LastDate     string              `json:"last_date,omitempty"`
 }
 
-func (c *Client) ListHealthLogs() ([]HealthLog, error) {
-	var out []HealthLog
-	return out, c.Get("/health", &out)
-}
-
+func (c *Client) ListHealthLogs() ([]HealthLog, error) { return GetList[HealthLog](c, "/health") }
 func (c *Client) GetHealthLog(date string) (HealthLog, error) {
-	var out HealthLog
-	return out, c.Get("/health/"+url.PathEscape(date), &out)
+	return GetOne[HealthLog](c, "/health/"+url.PathEscape(date))
 }
-
 func (c *Client) UpsertHealthLog(date string, in HealthInput) (HealthLog, error) {
-	var out HealthLog
-	return out, c.Put("/health/"+url.PathEscape(date), in, &out)
+	return PutOne[HealthLog](c, "/health/"+url.PathEscape(date), in)
 }
-
 func (c *Client) DeleteHealthLog(date string) error {
 	return c.Delete("/health/" + url.PathEscape(date))
 }
@@ -117,8 +109,7 @@ func (c *Client) HealthHistory(days int) ([]HealthLog, error) {
 }
 
 func (c *Client) AddHealthFood(date string, food HealthFood) (HealthLog, error) {
-	var out HealthLog
-	return out, c.Post("/health/"+url.PathEscape(date)+"/foods", food, &out)
+	return PostOne[HealthLog](c, "/health/"+url.PathEscape(date)+"/foods", food)
 }
 
 func (c *Client) DeleteHealthFood(date, foodID string) (HealthLog, error) {
@@ -127,6 +118,5 @@ func (c *Client) DeleteHealthFood(date, foodID string) (HealthLog, error) {
 }
 
 func (c *Client) UpdateHealthTotals(date string, in map[string]any) (HealthLog, error) {
-	var out HealthLog
-	return out, c.Put("/health/"+url.PathEscape(date)+"/totals", in, &out)
+	return PutOne[HealthLog](c, "/health/"+url.PathEscape(date)+"/totals", in)
 }
