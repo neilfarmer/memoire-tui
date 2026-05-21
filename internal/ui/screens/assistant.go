@@ -1,7 +1,9 @@
 package screens
 
 import (
+	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -56,8 +58,10 @@ type chatReplyMsg struct {
 func newAssistant(c *api.Client) *Assistant {
 	a := &Assistant{client: c, model: "nova-lite"}
 	a.input = textarea.New()
-	a.input.Placeholder = "Type a message... (ctrl+j to send)"
+	a.input.Placeholder = "Message memoire… (ctrl+j to send)"
 	a.input.SetHeight(3)
+	a.input.ShowLineNumbers = false
+	a.input.CharLimit = 0
 	a.view = viewport.New(40, 20)
 	a.input.Focus()
 	return a
@@ -127,13 +131,6 @@ func (a *Assistant) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return a, a.clearHistory()
 	case "ctrl+n":
 		return a, a.newConversation()
-	case "ctrl+m":
-		if a.model == "nova-lite" {
-			a.model = "nova-pro"
-		} else {
-			a.model = "nova-lite"
-		}
-		return a, nil
 	case "tab":
 		a.pane = (a.pane + 1) % 3
 		switch a.pane {
@@ -142,6 +139,12 @@ func (a *Assistant) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		default:
 			a.input.Blur()
 		}
+		return a, nil
+	}
+	// `m` toggles models when the textarea isn't focused. ctrl+m is the
+	// same byte as Enter in every terminal so the old binding was dead.
+	if a.pane != assistantPaneInput && m.String() == "m" {
+		a.toggleModel()
 		return a, nil
 	}
 	if a.pane == assistantPaneConvos {
@@ -171,16 +174,55 @@ func (a *Assistant) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return a, cmd
 }
 
+func (a *Assistant) toggleModel() {
+	if a.model == "nova-lite" {
+		a.model = "nova-pro"
+	} else {
+		a.model = "nova-lite"
+	}
+}
+
 func (a *Assistant) refreshView() {
 	rows := []string{}
+	w := a.view.Width - 4
+	if w < 20 {
+		w = 20
+	}
 	for _, m := range a.messages {
-		role := titleCase(m.Role)
-		head := lipgloss.NewStyle().Foreground(styles.Primary).Bold(true).Render(role)
-		body := components.RenderMarkdown(m.Content, a.view.Width-2)
-		rows = append(rows, head, body, "")
+		rows = append(rows, renderMessageBubble(m.Role, m.Content, w, a.model))
+		rows = append(rows, "")
 	}
 	a.view.SetContent(strings.Join(rows, "\n"))
 	a.view.GotoBottom()
+}
+
+// renderMessageBubble draws a single chat turn: a coloured role label
+// followed by a bordered box containing the markdown-rendered content.
+// User turns use accent (amber); assistant turns use primary (cyan).
+func renderMessageBubble(role, content string, width int, model string) string {
+	isUser := role == "user"
+	var labelStyle lipgloss.Style
+	var borderColor lipgloss.AdaptiveColor
+	var label string
+	if isUser {
+		labelStyle = lipgloss.NewStyle().Foreground(styles.Accent).Bold(true)
+		borderColor = styles.Accent
+		label = "you"
+	} else {
+		labelStyle = lipgloss.NewStyle().Foreground(styles.Primary).Bold(true)
+		borderColor = styles.Primary
+		label = model
+		if label == "" {
+			label = "memoire"
+		}
+	}
+	box := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(borderColor).
+		Padding(0, 1).
+		Width(width)
+	body := components.RenderMarkdown(content, width-4)
+	return labelStyle.Render(label) + "\n" + box.Render(body)
 }
 
 func (a *Assistant) send() tea.Cmd {
@@ -219,85 +261,219 @@ func (a *Assistant) newConversation() tea.Cmd {
 	return nil
 }
 
-// titleCase uppercases the first rune of an ASCII word; replaces deprecated
-// strings.Title for the assistant role labels.
-func titleCase(s string) string {
-	if s == "" {
-		return ""
+// currentConvTitle returns the title of the currently-loaded conversation
+// or empty if none.
+func (a *Assistant) currentConvTitle() string {
+	for _, c := range a.convos {
+		if c.ConversationID == a.currentConv {
+			return c.Title
+		}
 	}
-	r := []rune(s)
-	if r[0] >= 'a' && r[0] <= 'z' {
-		r[0] -= 32
-	}
-	return string(r)
+	return ""
 }
 
 func (a *Assistant) View() string {
-	leftWidth := 24
-	rightWidth := a.width - leftWidth - 4
+	const (
+		convoWidth  = 30
+		headerLines = 3 // header bar + spacer + bottom rule
+		inputLines  = 5 // input box (with border) + status line + spacer
+	)
+	rightWidth := a.width - convoWidth - 3
 	if rightWidth < 30 {
 		rightWidth = 30
 	}
+	viewHeight := a.height - headerLines - inputLines
+	if viewHeight < 5 {
+		viewHeight = 5
+	}
 	a.view.Width = rightWidth - 2
-	a.view.Height = a.height - 8
+	a.view.Height = viewHeight
+	a.refreshView()
 
-	convoRows := []string{styles.Title.Render("Conversations")}
-	for i, c := range a.convos {
-		row := c.Title
-		if row == "" {
-			row = c.ConversationID
-		}
-		if i == a.convCur {
-			row = styles.Selected.Render(row)
-		}
-		convoRows = append(convoRows, truncate(row, leftWidth-4))
-	}
-	convoBox := styles.Box
-	if a.pane == assistantPaneConvos {
-		convoBox = styles.BoxFocused
-	}
-	left := convoBox.Width(leftWidth).Render(strings.Join(convoRows, "\n"))
+	header := a.renderHeader()
+	convos := a.renderConvos(convoWidth, a.height-headerLines)
+	messages := a.renderMessages(rightWidth, viewHeight)
+	input := a.renderInput(rightWidth)
+	hints := a.renderHints(rightWidth)
 
-	msgBox := styles.Box
-	if a.pane == assistantPaneMessages {
-		msgBox = styles.BoxFocused
-	}
-	msgs := msgBox.Width(rightWidth).Height(a.height - 8).Render(a.view.View())
+	right := lipgloss.JoinVertical(lipgloss.Left, messages, input, hints)
+	body := lipgloss.JoinHorizontal(lipgloss.Top, convos, "  ", right)
+	return lipgloss.JoinVertical(lipgloss.Left, header, body)
+}
 
-	a.input.SetWidth(rightWidth - 2)
-	inputBox := styles.Box
-	if a.pane == assistantPaneInput {
-		inputBox = styles.BoxFocused
+func (a *Assistant) renderHeader() string {
+	title := a.currentConvTitle()
+	if title == "" {
+		title = "New conversation"
 	}
-	input := inputBox.Width(rightWidth).Render(a.input.View())
+	titleStyled := styles.Title.Render(title)
 
-	statusLine := styles.MutedText.Render("model " + a.model + " · ctrl+j send · ctrl+m cycle model · ctrl+l clear · ctrl+n new convo · tab switch pane")
+	chips := []string{}
 	if a.sending {
-		statusLine = styles.SuccessText.Render("...sending...") + "  " + statusLine
+		chips = append(chips, styles.ChipAccent.Render("thinking…"))
 	}
+	modelChip := styles.ChipPrimary.Render("model: " + a.model)
+	chips = append(chips, modelChip)
+	right := lipgloss.JoinHorizontal(lipgloss.Top, chips...)
 
-	right := lipgloss.JoinVertical(lipgloss.Left, msgs, input, statusLine)
-	return lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+	leftW := lipgloss.Width(titleStyled)
+	rightW := lipgloss.Width(right)
+	gap := a.width - leftW - rightW - 2
+	if gap < 1 {
+		gap = 1
+	}
+	bar := lipgloss.JoinHorizontal(lipgloss.Top,
+		titleStyled,
+		lipgloss.NewStyle().Width(gap).Render(""),
+		right,
+	)
+	rule := lipgloss.NewStyle().Foreground(styles.Border).Render(strings.Repeat("─", maxInt(a.width-2, 10)))
+	return lipgloss.JoinVertical(lipgloss.Left, bar, rule)
+}
+
+func (a *Assistant) renderConvos(width, height int) string {
+	rows := []string{styles.Heading.Render("Conversations")}
+	if len(a.convos) == 0 {
+		rows = append(rows, styles.MutedText.Render("(no conversations yet)"))
+	}
+	for i, c := range a.convos {
+		title := c.Title
+		if title == "" {
+			title = "untitled"
+		}
+		active := c.ConversationID == a.currentConv
+		titleWidth := width - 4
+		ts := relativeTime(c.UpdatedAt)
+		if ts == "" {
+			ts = relativeTime(c.CreatedAt)
+		}
+		titleStr := truncate(title, titleWidth-len(ts)-2)
+		line := titleStr + "  " + styles.MutedText.Render(ts)
+		if active {
+			line = lipgloss.NewStyle().Foreground(styles.Primary).Bold(true).Render("● ") + line
+		} else {
+			line = "  " + line
+		}
+		if i == a.convCur && a.pane == assistantPaneConvos {
+			line = styles.Selected.Render(line)
+		}
+		rows = append(rows, line)
+	}
+	box := styles.Box
+	if a.pane == assistantPaneConvos {
+		box = styles.BoxFocused
+	}
+	if height-2 > 0 {
+		box = box.Height(height - 2)
+	}
+	return box.Width(width).Render(strings.Join(rows, "\n"))
+}
+
+func (a *Assistant) renderMessages(width, height int) string {
+	if len(a.messages) == 0 {
+		empty := lipgloss.JoinVertical(lipgloss.Center,
+			styles.Heading.Render("Start a conversation"),
+			"",
+			styles.MutedText.Render("Type a message below and press ctrl+j to send."),
+			styles.MutedText.Render("Press tab to switch panes, m to toggle the model."),
+		)
+		placed := lipgloss.Place(width-2, height, lipgloss.Center, lipgloss.Center, empty)
+		box := styles.Box
+		if a.pane == assistantPaneMessages {
+			box = styles.BoxFocused
+		}
+		return box.Width(width).Height(height).Render(placed)
+	}
+	box := styles.Box
+	if a.pane == assistantPaneMessages {
+		box = styles.BoxFocused
+	}
+	return box.Width(width).Height(height).Render(a.view.View())
+}
+
+func (a *Assistant) renderInput(width int) string {
+	a.input.SetWidth(width - 4)
+	box := styles.Box
+	if a.pane == assistantPaneInput {
+		box = styles.BoxFocused
+	}
+	prompt := lipgloss.NewStyle().Foreground(styles.Primary).Bold(true).Render("> ")
+	body := lipgloss.JoinHorizontal(lipgloss.Top, prompt, a.input.View())
+	return box.Width(width).Render(body)
+}
+
+func (a *Assistant) renderHints(width int) string {
+	hints := []string{
+		styles.KeyHint("ctrl+j", "send"),
+		styles.KeyHint("tab", "switch pane"),
+		styles.KeyHint("ctrl+n", "new chat"),
+		styles.KeyHint("ctrl+l", "clear"),
+	}
+	if a.pane != assistantPaneInput {
+		hints = append(hints, styles.KeyHint("m", "toggle model"))
+	}
+	hints = append(hints, styles.KeyHint(":", "more"))
+	line := strings.Join(hints, "   ")
+	return lipgloss.NewStyle().Width(width).Render(line)
+}
+
+func relativeTime(s string) string {
+	if s == "" {
+		return ""
+	}
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		// Try a few looser forms before giving up.
+		for _, layout := range []string{"2006-01-02T15:04:05Z", "2006-01-02 15:04:05", "2006-01-02"} {
+			if t, err = time.Parse(layout, s); err == nil {
+				break
+			}
+		}
+		if err != nil {
+			return ""
+		}
+	}
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh", int(d.Hours()))
+	case d < 7*24*time.Hour:
+		return fmt.Sprintf("%dd", int(d.Hours()/24))
+	default:
+		return t.Format("Jan 2")
+	}
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func (a *Assistant) Title() string { return "Assistant" }
 func (a *Assistant) StatusHints() []string {
 	return []string{
 		styles.KeyHint("ctrl+j", "send"),
-		styles.KeyHint("ctrl+l", "clear"),
-		styles.KeyHint("ctrl+m", "model"),
-		styles.KeyHint("ctrl+n", "new convo"),
 		styles.KeyHint("tab", "pane"),
+		styles.KeyHint("ctrl+n", "new"),
+		styles.KeyHint("ctrl+l", "clear"),
+		styles.KeyHint("m", "model"),
 	}
 }
 func (a *Assistant) Help() []components.HelpEntry {
 	return []components.HelpEntry{
 		{Keys: "ctrl+j", Desc: "send message"},
-		{Keys: "ctrl+m", Desc: "toggle model (nova-lite / nova-pro)"},
+		{Keys: "m", Desc: "toggle model (nova-lite / nova-pro) — only when input is not focused"},
 		{Keys: "ctrl+l", Desc: "clear current conversation"},
 		{Keys: "ctrl+n", Desc: "start a new conversation"},
 		{Keys: "tab", Desc: "cycle pane (input / conversations / messages)"},
 		{Keys: "enter (in conversations)", Desc: "open conversation"},
+		{Keys: ":model-nova-lite / :model-nova-pro", Desc: "switch model via the command palette"},
 	}
 }
 func (a *Assistant) SetSize(w, h int) { a.width, a.height = w, h }
