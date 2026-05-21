@@ -108,14 +108,7 @@ func (t *Tokens) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return t.handleKey(m)
 	}
 	if t.mode == tokenForm && t.form != nil {
-		f, cmd := t.form.Update(msg)
-		if x, ok := f.(*huh.Form); ok {
-			t.form = x
-		}
-		if t.form.State == huh.StateCompleted {
-			return t, t.submit()
-		}
-		return t, cmd
+		return t, updateForm(&t.form, msg, func() { t.mode = tokenView }, t.submit)
 	}
 	if t.mode == tokenView {
 		var cmd tea.Cmd
@@ -130,7 +123,7 @@ func (t *Tokens) refreshRows() {
 	for _, x := range t.tokens {
 		rows = append(rows, components.Row{x.Name, orDash(x.CreatedAt), orDash(x.LastUsedAt)})
 	}
-	t.tbl.SetRows(components.Stripe(rows, tokenCols(t.width-6)))
+	t.tbl.SetRows(rows)
 }
 
 func (t *Tokens) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -142,30 +135,9 @@ func (t *Tokens) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return t, nil
 	case tokenForm:
-		if m.String() == "esc" {
-			t.mode = tokenView
-			t.form = nil
-			return t, nil
-		}
-		if m.String() == "ctrl+s" {
-			return t, t.submit()
-		}
-		f, cmd := t.form.Update(m)
-		if x, ok := f.(*huh.Form); ok {
-			t.form = x
-		}
-		if t.form.State == huh.StateCompleted {
-			return t, t.submit()
-		}
-		return t, cmd
+		return t, updateForm(&t.form, m, func() { t.mode = tokenView }, t.submit)
 	case tokenConfirmDelete:
-		if m.String() == "y" {
-			return t, t.deleteSelected()
-		}
-		if m.String() == "n" || m.String() == "esc" {
-			t.mode = tokenView
-		}
-		return t, nil
+		return t, handleConfirmDelete(m.String(), t.deleteSelected, func() { t.mode = tokenView })
 	}
 	if t.patForbidden {
 		return t, nil
@@ -237,7 +209,7 @@ func (t *Tokens) View() string {
 		}
 		return styles.Box.Render(strings.Join(rows, "\n"))
 	}
-	t.tbl.SetColumns(components.WithStripeColumn(tokenCols(t.width - 6)))
+	t.tbl.SetColumns(tokenCols(t.width - 6))
 	if t.height-6 > 0 {
 		t.tbl.SetHeight(t.height - 6)
 	}

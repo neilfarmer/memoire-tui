@@ -1,7 +1,6 @@
 package screens
 
 import (
-	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -101,14 +100,7 @@ func (b *Bookmarks) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return b.handleKey(m)
 	}
 	if b.mode == bookmarkForm && b.form != nil {
-		f, cmd := b.form.Update(msg)
-		if x, ok := f.(*huh.Form); ok {
-			b.form = x
-		}
-		if b.form.State == huh.StateCompleted {
-			return b, b.submit()
-		}
-		return b, cmd
+		return b, updateForm(&b.form, msg, func() { b.mode = bookmarkList }, b.submit)
 	}
 	if b.mode == bookmarkList {
 		var cmd tea.Cmd
@@ -131,20 +123,16 @@ func (b *Bookmarks) refreshRows() {
 			truncate(strings.Join(x.Tags, ","), 22),
 		})
 	}
-	b.tbl.SetRows(components.Stripe(rows, bookmarkCols(b.width-6)))
+	b.tbl.SetRows(rows)
 }
 
 func (b *Bookmarks) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch b.mode {
 	case bookmarkConfirmDelete:
-		if m.String() == "y" {
-			return b, b.deleteSelected()
-		}
-		if m.String() == "n" || m.String() == "esc" {
+		return b, handleConfirmDelete(m.String(), b.deleteSelected, func() {
 			b.mode = bookmarkList
 			b.pendingDeleteID = ""
-		}
-		return b, nil
+		})
 	case bookmarkDetail:
 		switch m.String() {
 		case "esc":
@@ -163,22 +151,7 @@ func (b *Bookmarks) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return b, nil
 	case bookmarkForm:
-		if m.String() == "esc" {
-			b.mode = bookmarkList
-			b.form = nil
-			return b, nil
-		}
-		if m.String() == "ctrl+s" {
-			return b, b.submit()
-		}
-		f, cmd := b.form.Update(m)
-		if x, ok := f.(*huh.Form); ok {
-			b.form = x
-		}
-		if b.form.State == huh.StateCompleted {
-			return b, b.submit()
-		}
-		return b, cmd
+		return b, updateForm(&b.form, m, func() { b.mode = bookmarkList }, b.submit)
 	}
 	switch m.String() {
 	case "enter":
@@ -240,12 +213,7 @@ func (b *Bookmarks) startEdit() tea.Cmd {
 func (b *Bookmarks) newForm() *huh.Form {
 	d := &b.formIn
 	return huh.NewForm(huh.NewGroup(
-		huh.NewInput().Title("URL").Value(&d.url).Validate(func(s string) error {
-			if strings.TrimSpace(s) == "" {
-				return fmt.Errorf("required")
-			}
-			return nil
-		}),
+		huh.NewInput().Title("URL").Value(&d.url).Validate(notEmpty),
 		huh.NewInput().Title("Title").Value(&d.title),
 		huh.NewInput().Title("Tags (comma separated)").Value(&d.tags),
 		huh.NewText().Title("Note").Value(&d.note).Lines(3),
@@ -297,7 +265,7 @@ func (b *Bookmarks) View() string {
 	if b.loading && len(b.items) == 0 {
 		return styles.MutedText.Render("Loading bookmarks...")
 	}
-	b.tbl.SetColumns(components.WithStripeColumn(bookmarkCols(b.width - 6)))
+	b.tbl.SetColumns(bookmarkCols(b.width - 6))
 	if b.height-6 > 0 {
 		b.tbl.SetHeight(b.height - 6)
 	}
@@ -357,7 +325,7 @@ func (b *Bookmarks) Help() []components.HelpEntry {
 }
 func (b *Bookmarks) SetSize(w, h int) {
 	b.width, b.height = w, h
-	b.tbl.SetColumns(components.WithStripeColumn(bookmarkCols(w - 6)))
+	b.tbl.SetColumns(bookmarkCols(w - 6))
 	if h-6 > 0 {
 		b.tbl.SetHeight(h - 6)
 	}

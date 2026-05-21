@@ -79,3 +79,17 @@ release:
     name: memoire-tui
   prerelease: auto
   name_template: 'memoire-tui {{ .Tag }}'
+
+brews:
+  - name: memoire
+    repository:
+      owner: neilfarmer
+      name: homebrew-tap
+    homepage: 'https://github.com/neilfarmer/memoire-tui'
+    description: 'Bubble Tea TUI client for the memoire web API'
+    license: 'MIT'
+    install: |
+      bin.install "memoire"
+    test: |
+      system "#{bin}/memoire", "--version"
+    skip_upload: auto

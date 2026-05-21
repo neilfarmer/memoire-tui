@@ -2,6 +2,7 @@ package screens
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -94,6 +95,11 @@ func (d *Dashboard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		d.streak = best
 		if len(m.notes) > 0 {
+			// Sort by UpdatedAt descending so the dashboard's "latest"
+			// is stable regardless of how the API returns the list.
+			sort.Slice(m.notes, func(i, j int) bool {
+				return m.notes[i].UpdatedAt > m.notes[j].UpdatedAt
+			})
 			d.latestNote = m.notes[0].Title
 			d.latestNoteAt = m.notes[0].UpdatedAt
 		}

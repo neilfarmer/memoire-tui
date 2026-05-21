@@ -43,23 +43,19 @@ type AssistantMemory map[string]any
 type AssistantProfile map[string]any
 
 func (c *Client) Chat(req ChatRequest) (ChatResponse, error) {
-	var out ChatResponse
-	return out, c.Post("/assistant/chat", req, &out)
+	return PostOne[ChatResponse](c, "/assistant/chat", req)
 }
 
 func (c *Client) ListConversations() ([]Conversation, error) {
-	var out []Conversation
-	return out, c.Get("/assistant/conversations", &out)
+	return GetList[Conversation](c, "/assistant/conversations")
 }
 
 func (c *Client) CreateConversation(title string) (Conversation, error) {
-	var out Conversation
-	return out, c.Post("/assistant/conversations", map[string]string{"title": title}, &out)
+	return PostOne[Conversation](c, "/assistant/conversations", map[string]string{"title": title})
 }
 
 func (c *Client) GetConversation(id string) (ConversationDetail, error) {
-	var out ConversationDetail
-	return out, c.Get("/assistant/conversations/"+url.PathEscape(id), &out)
+	return GetOne[ConversationDetail](c, "/assistant/conversations/"+url.PathEscape(id))
 }
 
 func (c *Client) RenameConversation(id, title string) error {
@@ -71,8 +67,7 @@ func (c *Client) DeleteConversation(id string) error {
 }
 
 func (c *Client) AssistantHistory() ([]ChatMessage, error) {
-	var out []ChatMessage
-	return out, c.Get("/assistant/history", &out)
+	return GetList[ChatMessage](c, "/assistant/history")
 }
 
 func (c *Client) ClearAssistantHistory() error {

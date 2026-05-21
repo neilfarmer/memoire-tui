@@ -2,7 +2,6 @@ package api
 
 import (
 	"net/url"
-	"strconv"
 )
 
 type Feed struct {
@@ -30,19 +29,11 @@ type ArticleText struct {
 	Text  string `json:"text"`
 }
 
-func (c *Client) ListFeeds() ([]Feed, error) {
-	var out []Feed
-	return out, c.Get("/feeds", &out)
-}
-
+func (c *Client) ListFeeds() ([]Feed, error) { return GetList[Feed](c, "/feeds") }
 func (c *Client) AddFeed(feedURL string) (Feed, error) {
-	var out Feed
-	return out, c.Post("/feeds", map[string]string{"url": feedURL}, &out)
+	return PostOne[Feed](c, "/feeds", map[string]string{"url": feedURL})
 }
-
-func (c *Client) DeleteFeed(id string) error {
-	return c.Delete("/feeds/" + url.PathEscape(id))
-}
+func (c *Client) DeleteFeed(id string) error { return c.Delete("/feeds/" + url.PathEscape(id)) }
 
 func (c *Client) ListFeedArticles(force bool) ([]Article, error) {
 	q := url.Values{}
@@ -87,14 +78,4 @@ func (c *Client) MarkArticlesRead(urls []string) (int, error) {
 		return 0, err
 	}
 	return out.MarkedRead, nil
-}
-
-// FeedURL is a tiny helper for URL composition (currently unused but kept for
-// symmetry with notes.AttachmentURL).
-func (c *Client) FeedURL() string { return c.BaseURL + "/feeds" }
-
-// ParseLimit is a small helper used by callers when echoing limits in the URL.
-func ParseLimit(s string) int {
-	n, _ := strconv.Atoi(s)
-	return n
 }

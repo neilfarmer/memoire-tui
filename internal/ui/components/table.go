@@ -71,13 +71,6 @@ func NewTable(cols []Column, rows []Row, height int) striped.Model {
 	return t
 }
 
-// WithStripeColumn is now a no-op — the striped fork handles row backgrounds
-// at renderRow time, so callers do not need a synthetic stripe column.
-func WithStripeColumn(cols []Column) []Column { return cols }
-
-// Stripe is a no-op pass-through. Kept so existing call sites compile.
-func Stripe(rows []Row, _ ...[]Column) []Row { return rows }
-
 // FrameTable renders a table k9s-style: bold title with count badge, the
 // table itself (no surrounding box — the table column header acts as the
 // frame), and a key-hint footer.

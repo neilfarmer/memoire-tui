@@ -1,8 +1,8 @@
 package screens
 
 import (
+	"errors"
 	"fmt"
-	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
@@ -132,20 +132,28 @@ func (f *Finances) refresh() tea.Cmd {
 	c := f.client
 	return func() tea.Msg {
 		var msg financesLoadedMsg
+		var errs []error
 		if d, err := c.ListDebts(); err == nil {
 			msg.debts = d
 		} else {
-			msg.err = err
+			errs = append(errs, err)
 		}
 		if inc, err := c.ListIncome(); err == nil {
 			msg.incomes = inc
+		} else {
+			errs = append(errs, err)
 		}
 		if e, err := c.ListFixedExpenses(); err == nil {
 			msg.expenses = e
+		} else {
+			errs = append(errs, err)
 		}
 		if s, err := c.FinancesSummary(); err == nil {
 			msg.summary = s
+		} else {
+			errs = append(errs, err)
 		}
+		msg.err = errors.Join(errs...)
 		return msg
 	}
 }
@@ -169,14 +177,7 @@ func (f *Finances) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return f.handleKey(m)
 	}
 	if f.mode == financeForm && f.form != nil {
-		ff, cmd := f.form.Update(msg)
-		if x, ok := ff.(*huh.Form); ok {
-			f.form = x
-		}
-		if f.form.State == huh.StateCompleted {
-			return f, f.submit()
-		}
-		return f, cmd
+		return f, updateForm(&f.form, msg, func() { f.mode = financeList }, f.submit)
 	}
 	if f.mode == financeList {
 		var cmd tea.Cmd
@@ -204,7 +205,7 @@ func (f *Finances) refreshRows() {
 			x.Name,
 		})
 	}
-	f.debtsTbl.SetRows(components.Stripe(drows, debtCols(f.width-6)))
+	f.debtsTbl.SetRows(drows)
 	irows := make([]components.Row, 0, len(f.incomes))
 	for _, x := range f.incomes {
 		irows = append(irows, components.Row{
@@ -214,7 +215,7 @@ func (f *Finances) refreshRows() {
 			x.Name,
 		})
 	}
-	f.incomesTbl.SetRows(components.Stripe(irows, incomeCols(f.width-6)))
+	f.incomesTbl.SetRows(irows)
 	erows := make([]components.Row, 0, len(f.expenses))
 	for _, x := range f.expenses {
 		erows = append(erows, components.Row{
@@ -225,37 +226,18 @@ func (f *Finances) refreshRows() {
 			x.Name,
 		})
 	}
-	f.expensesTbl.SetRows(components.Stripe(erows, expenseCols(f.width-6)))
+	f.expensesTbl.SetRows(erows)
 }
 
 func (f *Finances) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch f.mode {
 	case financeConfirmDelete:
-		if m.String() == "y" {
-			return f, f.deleteSelected()
-		}
-		if m.String() == "n" || m.String() == "esc" {
+		return f, handleConfirmDelete(m.String(), f.deleteSelected, func() {
 			f.mode = financeList
 			f.pendingDeleteID = ""
-		}
-		return f, nil
+		})
 	case financeForm:
-		if m.String() == "esc" {
-			f.mode = financeList
-			f.form = nil
-			return f, nil
-		}
-		if m.String() == "ctrl+s" {
-			return f, f.submit()
-		}
-		ff, cmd := f.form.Update(m)
-		if x, ok := ff.(*huh.Form); ok {
-			f.form = x
-		}
-		if f.form.State == huh.StateCompleted {
-			return f, f.submit()
-		}
-		return f, cmd
+		return f, updateForm(&f.form, m, func() { f.mode = financeList }, f.submit)
 	}
 	switch m.String() {
 	case "tab":
@@ -395,9 +377,9 @@ func (f *Finances) newDebtForm() *huh.Form {
 			huh.NewOption("Line of credit", "line_of_credit"),
 			huh.NewOption("Other", "other"),
 		).Value(&d.debtType),
-		huh.NewInput().Title("Balance").Value(&d.amount),
-		huh.NewInput().Title("APR (%)").Value(&d.apr),
-		huh.NewInput().Title("Monthly payment").Value(&d.monthlyPay),
+		huh.NewInput().Title("Balance").Value(&d.amount).Validate(validateOptionalFloat),
+		huh.NewInput().Title("APR (%)").Value(&d.apr).Validate(validateOptionalFloat),
+		huh.NewInput().Title("Monthly payment").Value(&d.monthlyPay).Validate(validateOptionalFloat),
 		huh.NewText().Title("Notes").Value(&d.notes).Lines(2),
 	)).WithKeyMap(components.FormKeyMap())
 }
@@ -406,7 +388,7 @@ func (f *Finances) newIncomeForm() *huh.Form {
 	d := &f.formIn
 	return huh.NewForm(huh.NewGroup(
 		huh.NewInput().Title("Source").Value(&d.name).Validate(notEmpty),
-		huh.NewInput().Title("Amount").Value(&d.amount),
+		huh.NewInput().Title("Amount").Value(&d.amount).Validate(validateOptionalFloat),
 		huh.NewSelect[string]().Title("Frequency").Options(frequencyOptions()...).Value(&d.frequency),
 		huh.NewText().Title("Notes").Value(&d.notes).Lines(2),
 	)).WithKeyMap(components.FormKeyMap())
@@ -426,18 +408,11 @@ func (f *Finances) newExpenseForm() *huh.Form {
 			huh.NewOption("Healthcare", "healthcare"),
 			huh.NewOption("Other", "other"),
 		).Value(&d.category),
-		huh.NewInput().Title("Amount").Value(&d.amount),
+		huh.NewInput().Title("Amount").Value(&d.amount).Validate(validateOptionalFloat),
 		huh.NewSelect[string]().Title("Frequency").Options(frequencyOptions()...).Value(&d.frequency),
-		huh.NewInput().Title("Due day").Value(&d.dueDay),
+		huh.NewInput().Title("Due day").Value(&d.dueDay).Validate(validateOptionalInt),
 		huh.NewText().Title("Notes").Value(&d.notes).Lines(2),
 	)).WithKeyMap(components.FormKeyMap())
-}
-
-func notEmpty(s string) error {
-	if strings.TrimSpace(s) == "" {
-		return fmt.Errorf("required")
-	}
-	return nil
 }
 
 func (f *Finances) submit() tea.Cmd {
@@ -575,15 +550,15 @@ func (f *Finances) renderTab() string {
 	}
 	switch f.tab {
 	case tabDebts:
-		f.debtsTbl.SetColumns(components.WithStripeColumn(debtCols(width)))
+		f.debtsTbl.SetColumns(debtCols(width))
 		f.debtsTbl.SetHeight(height)
 		return components.FrameTable("Debts", len(f.debts), f.debtsTbl, hints, true)
 	case tabIncome:
-		f.incomesTbl.SetColumns(components.WithStripeColumn(incomeCols(width)))
+		f.incomesTbl.SetColumns(incomeCols(width))
 		f.incomesTbl.SetHeight(height)
 		return components.FrameTable("Income", len(f.incomes), f.incomesTbl, hints, true)
 	case tabExpenses:
-		f.expensesTbl.SetColumns(components.WithStripeColumn(expenseCols(width)))
+		f.expensesTbl.SetColumns(expenseCols(width))
 		f.expensesTbl.SetHeight(height)
 		return components.FrameTable("Fixed expenses", len(f.expenses), f.expensesTbl, hints, true)
 	}

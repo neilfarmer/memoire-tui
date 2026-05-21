@@ -127,3 +127,23 @@ func TestDoContextCancellation(t *testing.T) {
 		t.Errorf("expected context.DeadlineExceeded; got %v", err)
 	}
 }
+
+// TestWithContextCancellation proves c.WithContext(ctx) propagates the
+// caller's cancellation through the existing Do/Get/Post path without
+// every call site needing to use DoContext explicitly.
+func TestWithContextCancellation(t *testing.T) {
+	c, srv := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(2 * time.Second)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
+	defer cancel()
+	err := c.WithContext(ctx).Get("/slow", nil)
+	if err == nil {
+		t.Fatal("expected an error from cancelled context, got nil")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("expected context.DeadlineExceeded; got %v", err)
+	}
+}

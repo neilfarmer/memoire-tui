@@ -102,36 +102,14 @@ func (s *Settings) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return s.handleKey(m)
 	}
 	if s.mode == settingsEdit && s.form != nil {
-		f, cmd := s.form.Update(msg)
-		if x, ok := f.(*huh.Form); ok {
-			s.form = x
-		}
-		if s.form.State == huh.StateCompleted {
-			return s, s.submit()
-		}
-		return s, cmd
+		return s, updateForm(&s.form, msg, func() { s.mode = settingsView }, s.submit)
 	}
 	return s, nil
 }
 
 func (s *Settings) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if s.mode == settingsEdit {
-		if m.String() == "esc" {
-			s.mode = settingsView
-			s.form = nil
-			return s, nil
-		}
-		if m.String() == "ctrl+s" {
-			return s, s.submit()
-		}
-		f, cmd := s.form.Update(m)
-		if x, ok := f.(*huh.Form); ok {
-			s.form = x
-		}
-		if s.form.State == huh.StateCompleted {
-			return s, s.submit()
-		}
-		return s, cmd
+		return s, updateForm(&s.form, m, func() { s.mode = settingsView }, s.submit)
 	}
 	switch m.String() {
 	case "e":
@@ -163,8 +141,8 @@ func (s *Settings) startEdit() tea.Cmd {
 		),
 		huh.NewGroup(
 			huh.NewInput().Title("ntfy.sh topic URL").Value(&d.ntfyURL),
-			huh.NewInput().Title("Autosave seconds").Value(&d.autosaveSeconds),
-			huh.NewInput().Title("Profile inference hours").Value(&d.profileInferenceHours),
+			huh.NewInput().Title("Autosave seconds").Value(&d.autosaveSeconds).Validate(validateOptionalInt),
+			huh.NewInput().Title("Profile inference hours").Value(&d.profileInferenceHours).Validate(validateOptionalInt),
 		),
 	).WithKeyMap(components.FormKeyMap())
 	s.mode = settingsEdit

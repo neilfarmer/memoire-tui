@@ -71,51 +71,35 @@ type FinancesSummary struct {
 	NetWorth      float64 `json:"net_worth,omitempty"`
 }
 
-func (c *Client) ListDebts() ([]Debt, error) {
-	var out []Debt
-	return out, c.Get("/debts", &out)
-}
-func (c *Client) CreateDebt(in DebtInput) (Debt, error) {
-	var out Debt
-	return out, c.Post("/debts", in, &out)
-}
+func (c *Client) ListDebts() ([]Debt, error)            { return GetList[Debt](c, "/debts") }
+func (c *Client) CreateDebt(in DebtInput) (Debt, error) { return PostOne[Debt](c, "/debts", in) }
 func (c *Client) UpdateDebt(id string, in DebtInput) (Debt, error) {
-	var out Debt
-	return out, c.Put("/debts/"+url.PathEscape(id), in, &out)
+	return PutOne[Debt](c, "/debts/"+url.PathEscape(id), in)
 }
 func (c *Client) DeleteDebt(id string) error { return c.Delete("/debts/" + url.PathEscape(id)) }
 
-func (c *Client) ListIncome() ([]Income, error) {
-	var out []Income
-	return out, c.Get("/income", &out)
-}
+func (c *Client) ListIncome() ([]Income, error) { return GetList[Income](c, "/income") }
 func (c *Client) CreateIncome(in IncomeInput) (Income, error) {
-	var out Income
-	return out, c.Post("/income", in, &out)
+	return PostOne[Income](c, "/income", in)
 }
 func (c *Client) UpdateIncome(id string, in IncomeInput) (Income, error) {
-	var out Income
-	return out, c.Put("/income/"+url.PathEscape(id), in, &out)
+	return PutOne[Income](c, "/income/"+url.PathEscape(id), in)
 }
 func (c *Client) DeleteIncome(id string) error { return c.Delete("/income/" + url.PathEscape(id)) }
 
 func (c *Client) ListFixedExpenses() ([]FixedExpense, error) {
-	var out []FixedExpense
-	return out, c.Get("/fixed-expenses", &out)
+	return GetList[FixedExpense](c, "/fixed-expenses")
 }
 func (c *Client) CreateFixedExpense(in FixedExpenseInput) (FixedExpense, error) {
-	var out FixedExpense
-	return out, c.Post("/fixed-expenses", in, &out)
+	return PostOne[FixedExpense](c, "/fixed-expenses", in)
 }
 func (c *Client) UpdateFixedExpense(id string, in FixedExpenseInput) (FixedExpense, error) {
-	var out FixedExpense
-	return out, c.Put("/fixed-expenses/"+url.PathEscape(id), in, &out)
+	return PutOne[FixedExpense](c, "/fixed-expenses/"+url.PathEscape(id), in)
 }
 func (c *Client) DeleteFixedExpense(id string) error {
 	return c.Delete("/fixed-expenses/" + url.PathEscape(id))
 }
 
 func (c *Client) FinancesSummary() (FinancesSummary, error) {
-	var out FinancesSummary
-	return out, c.Get("/finances/summary", &out)
+	return GetOne[FinancesSummary](c, "/finances/summary")
 }

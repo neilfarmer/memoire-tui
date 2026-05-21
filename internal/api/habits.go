@@ -30,24 +30,12 @@ type HabitInput struct {
 	TimeOfDay   string `json:"time_of_day,omitempty"`
 }
 
-func (c *Client) ListHabits() ([]Habit, error) {
-	var out []Habit
-	return out, c.Get("/habits", &out)
-}
-
-func (c *Client) CreateHabit(in HabitInput) (Habit, error) {
-	var out Habit
-	return out, c.Post("/habits", in, &out)
-}
-
+func (c *Client) ListHabits() ([]Habit, error)             { return GetList[Habit](c, "/habits") }
+func (c *Client) CreateHabit(in HabitInput) (Habit, error) { return PostOne[Habit](c, "/habits", in) }
 func (c *Client) UpdateHabit(id string, in HabitInput) (Habit, error) {
-	var out Habit
-	return out, c.Put("/habits/"+url.PathEscape(id), in, &out)
+	return PutOne[Habit](c, "/habits/"+url.PathEscape(id), in)
 }
-
-func (c *Client) DeleteHabit(id string) error {
-	return c.Delete("/habits/" + url.PathEscape(id))
-}
+func (c *Client) DeleteHabit(id string) error { return c.Delete("/habits/" + url.PathEscape(id)) }
 
 type HabitToggleResult struct {
 	HabitID string `json:"habit_id"`

@@ -46,10 +46,6 @@ func (h Header) View() string {
 	left := lipgloss.JoinHorizontal(lipgloss.Top, logo, "  ", sep, "  ", section)
 	leftWidth := lipgloss.Width(left)
 	rightWidth := lipgloss.Width(right)
-	gap := h.Width - leftWidth - rightWidth - 2
-	if gap < 1 {
-		gap = 1
-	}
 	// If the right chips would push past the available width, drop them
 	// progressively (least important first) until the bar fits.
 	for rightWidth > h.Width-leftWidth-4 && len(chips) > 0 {
@@ -57,7 +53,7 @@ func (h Header) View() string {
 		right = lipgloss.JoinHorizontal(lipgloss.Top, chips...)
 		rightWidth = lipgloss.Width(right)
 	}
-	gap = h.Width - leftWidth - rightWidth - 2
+	gap := h.Width - leftWidth - rightWidth - 2
 	if gap < 1 {
 		gap = 1
 	}

@@ -1,6 +1,7 @@
 package screens
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -154,20 +155,8 @@ func TestTasksFormReceivesTextInput(t *testing.T) {
 	tasks = m.(*Tasks)
 	// huh inputs bind to the *string field. Title should now contain X
 	// appended OR the form should accept the rune (depending on huh impl).
-	if !contains(tasks.formData.title, "X") && !contains(tasks.form.View(), "X") {
+	if !strings.Contains(tasks.formData.title, "X") && !strings.Contains(tasks.form.View(), "X") {
 		t.Errorf("after typing X, neither formData.title nor view contains it; title=%q view-len=%d",
 			tasks.formData.title, len(tasks.form.View()))
 	}
-}
-
-func contains(s, sub string) bool {
-	if sub == "" {
-		return true
-	}
-	for i := 0; i+len(sub) <= len(s); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
 }

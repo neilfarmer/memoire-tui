@@ -59,51 +59,32 @@ func (c *Client) ListNotes(query string) ([]NoteSummary, error) {
 }
 
 func (c *Client) GetNote(id string) (Note, error) {
-	var out Note
-	return out, c.Get("/notes/"+url.PathEscape(id), &out)
+	return GetOne[Note](c, "/notes/"+url.PathEscape(id))
 }
-
-func (c *Client) CreateNote(in NoteInput) (Note, error) {
-	var out Note
-	return out, c.Post("/notes", in, &out)
-}
-
+func (c *Client) CreateNote(in NoteInput) (Note, error) { return PostOne[Note](c, "/notes", in) }
 func (c *Client) UpdateNote(id string, in NoteInput) (Note, error) {
-	var out Note
-	return out, c.Put("/notes/"+url.PathEscape(id), in, &out)
+	return PutOne[Note](c, "/notes/"+url.PathEscape(id), in)
 }
-
-func (c *Client) DeleteNote(id string) error {
-	return c.Delete("/notes/" + url.PathEscape(id))
-}
+func (c *Client) DeleteNote(id string) error { return c.Delete("/notes/" + url.PathEscape(id)) }
 
 func (c *Client) ListNoteFolders() ([]NoteFolder, error) {
-	var out []NoteFolder
-	return out, c.Get("/notes/folders", &out)
+	return GetList[NoteFolder](c, "/notes/folders")
 }
-
 func (c *Client) CreateNoteFolder(in NoteFolderInput) (NoteFolder, error) {
-	var out NoteFolder
-	return out, c.Post("/notes/folders", in, &out)
+	return PostOne[NoteFolder](c, "/notes/folders", in)
 }
-
 func (c *Client) UpdateNoteFolder(id string, in NoteFolderInput) (NoteFolder, error) {
-	var out NoteFolder
-	return out, c.Put("/notes/folders/"+url.PathEscape(id), in, &out)
+	return PutOne[NoteFolder](c, "/notes/folders/"+url.PathEscape(id), in)
 }
-
 func (c *Client) DeleteNoteFolder(id string) error {
 	return c.Delete("/notes/folders/" + url.PathEscape(id))
 }
 
 func (c *Client) RequestNoteImageUpload(in map[string]any) (AttachmentRef, error) {
-	var out AttachmentRef
-	return out, c.Post("/notes/images", in, &out)
+	return PostOne[AttachmentRef](c, "/notes/images", in)
 }
-
 func (c *Client) RequestNoteAttachment(noteID string, in map[string]any) (AttachmentRef, error) {
-	var out AttachmentRef
-	return out, c.Post("/notes/"+url.PathEscape(noteID)+"/attachments", in, &out)
+	return PostOne[AttachmentRef](c, "/notes/"+url.PathEscape(noteID)+"/attachments", in)
 }
 
 func (c *Client) DeleteNoteAttachment(noteID, attachmentID string) error {

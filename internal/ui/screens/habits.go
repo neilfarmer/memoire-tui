@@ -88,14 +88,7 @@ func (h *Habits) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return h.handleKey(m)
 	}
 	if h.mode == habitForm && h.form != nil {
-		f, cmd := h.form.Update(msg)
-		if ff, ok := f.(*huh.Form); ok {
-			h.form = ff
-		}
-		if h.form.State == huh.StateCompleted {
-			return h, h.submit()
-		}
-		return h, cmd
+		return h, updateForm(&h.form, msg, func() { h.mode = habitList }, h.submit)
 	}
 	return h, nil
 }
@@ -103,30 +96,9 @@ func (h *Habits) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (h *Habits) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch h.mode {
 	case habitConfirmDelete:
-		if m.String() == "y" {
-			return h, h.deleteSelected()
-		}
-		if m.String() == "n" || m.String() == "esc" {
-			h.mode = habitList
-		}
-		return h, nil
+		return h, handleConfirmDelete(m.String(), h.deleteSelected, func() { h.mode = habitList })
 	case habitForm:
-		if m.String() == "esc" {
-			h.mode = habitList
-			h.form = nil
-			return h, nil
-		}
-		if m.String() == "ctrl+s" {
-			return h, h.submit()
-		}
-		f, cmd := h.form.Update(m)
-		if ff, ok := f.(*huh.Form); ok {
-			h.form = ff
-		}
-		if h.form.State == huh.StateCompleted {
-			return h, h.submit()
-		}
-		return h, cmd
+		return h, updateForm(&h.form, m, func() { h.mode = habitList }, h.submit)
 	}
 	switch m.String() {
 	case "up", "k":
@@ -191,12 +163,7 @@ func (h *Habits) startEdit() tea.Cmd {
 func (h *Habits) newForm(title string) *huh.Form {
 	d := &h.formIn
 	return huh.NewForm(huh.NewGroup(
-		huh.NewInput().Title("Name").Value(&d.name).Validate(func(s string) error {
-			if strings.TrimSpace(s) == "" {
-				return fmt.Errorf("required")
-			}
-			return nil
-		}),
+		huh.NewInput().Title("Name").Value(&d.name).Validate(notEmpty),
 		huh.NewText().Title("Description").Value(&d.desc).Lines(3),
 		huh.NewSelect[string]().Title("Frequency").Options(
 			huh.NewOption("Daily", "daily"),

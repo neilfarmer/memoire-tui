@@ -2,6 +2,7 @@ package screens
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -103,14 +104,7 @@ func (h *Health) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return h.handleKey(m)
 	}
 	if h.mode == healthForm && h.form != nil {
-		f, cmd := h.form.Update(msg)
-		if ff, ok := f.(*huh.Form); ok {
-			h.form = ff
-		}
-		if h.form.State == huh.StateCompleted {
-			return h, h.submit()
-		}
-		return h, cmd
+		return h, updateForm(&h.form, msg, func() { h.mode = healthView }, h.submit)
 	}
 	return h, nil
 }
@@ -118,35 +112,14 @@ func (h *Health) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (h *Health) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch h.mode {
 	case healthForm:
-		if m.String() == "esc" {
-			h.mode = healthView
-			h.form = nil
-			return h, nil
-		}
-		if m.String() == "ctrl+s" {
-			return h, h.submit()
-		}
-		f, cmd := h.form.Update(m)
-		if ff, ok := f.(*huh.Form); ok {
-			h.form = ff
-		}
-		if h.form.State == huh.StateCompleted {
-			return h, h.submit()
-		}
-		return h, cmd
+		return h, updateForm(&h.form, m, func() { h.mode = healthView }, h.submit)
 	case healthSummary:
 		if m.String() == "esc" || m.String() == "T" {
 			h.mode = healthView
 		}
 		return h, nil
 	case healthConfirmDelete:
-		if m.String() == "y" {
-			return h, h.deleteCurrent()
-		}
-		if m.String() == "n" || m.String() == "esc" {
-			h.mode = healthView
-		}
-		return h, nil
+		return h, handleConfirmDelete(m.String(), h.deleteCurrent, func() { h.mode = healthView })
 	}
 	switch m.String() {
 	case "left", "h":
@@ -180,11 +153,11 @@ func (h *Health) startEdit() tea.Cmd {
 	}
 	d := &h.formIn
 	h.form = huh.NewForm(huh.NewGroup(
-		huh.NewInput().Title("Steps").Value(&d.steps),
-		huh.NewInput().Title("Distance (mi)").Value(&d.distanceMi),
-		huh.NewInput().Title("Active minutes").Value(&d.activeMinutes),
-		huh.NewInput().Title("Calories burned").Value(&d.caloriesOut),
-		huh.NewInput().Title("Weight").Value(&d.weight),
+		huh.NewInput().Title("Steps").Value(&d.steps).Validate(validateOptionalInt),
+		huh.NewInput().Title("Distance (mi)").Value(&d.distanceMi).Validate(validateOptionalFloat),
+		huh.NewInput().Title("Active minutes").Value(&d.activeMinutes).Validate(validateOptionalInt),
+		huh.NewInput().Title("Calories burned").Value(&d.caloriesOut).Validate(validateOptionalFloat),
+		huh.NewInput().Title("Weight").Value(&d.weight).Validate(validateOptionalFloat),
 		huh.NewText().Title("Notes").Value(&d.notes).Lines(3),
 	)).WithKeyMap(components.FormKeyMap())
 	h.mode = healthForm
@@ -220,19 +193,6 @@ func (h *Health) submit() tea.Cmd {
 		return healthMutatedMsg{err: err}
 	}
 }
-
-func parseFloat(s string) (float64, error) {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return 0, fmt.Errorf("empty")
-	}
-	var f float64
-	_, err := fmt.Sscanf(s, "%f", &f)
-	return f, err
-}
-
-func intStr(n int) string       { return fmt.Sprintf("%d", n) }
-func floatStr(f float64) string { return fmt.Sprintf("%g", f) }
 
 func (h *Health) deleteCurrent() tea.Cmd {
 	c := h.client
@@ -303,8 +263,13 @@ func (h *Health) summaryView() string {
 	if h.summary == nil {
 		rows = append(rows, styles.MutedText.Render("Loading..."))
 	} else {
-		for k, v := range h.summary {
-			rows = append(rows, fmt.Sprintf("%-20s %v", k, v))
+		keys := make([]string, 0, len(h.summary))
+		for k := range h.summary {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			rows = append(rows, fmt.Sprintf("%-20s %v", k, h.summary[k]))
 		}
 	}
 	rows = append(rows, "", styles.MutedText.Render("esc to return"))

@@ -102,14 +102,7 @@ func (g *Goals) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return g.handleKey(m)
 	}
 	if g.mode == goalForm && g.form != nil {
-		f, cmd := g.form.Update(msg)
-		if x, ok := f.(*huh.Form); ok {
-			g.form = x
-		}
-		if g.form.State == huh.StateCompleted {
-			return g, g.submit()
-		}
-		return g, cmd
+		return g, updateForm(&g.form, msg, func() { g.mode = goalList }, g.submit)
 	}
 	if g.mode == goalList {
 		var cmd tea.Cmd
@@ -122,14 +115,10 @@ func (g *Goals) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (g *Goals) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch g.mode {
 	case goalConfirmDelete:
-		if m.String() == "y" {
-			return g, g.deleteSelected()
-		}
-		if m.String() == "n" || m.String() == "esc" {
+		return g, handleConfirmDelete(m.String(), g.deleteSelected, func() {
 			g.mode = goalList
 			g.pendingDeleteID = ""
-		}
-		return g, nil
+		})
 	case goalDetail:
 		switch m.String() {
 		case "esc":
@@ -144,22 +133,7 @@ func (g *Goals) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return g, nil
 	case goalForm:
-		if m.String() == "esc" {
-			g.mode = goalList
-			g.form = nil
-			return g, nil
-		}
-		if m.String() == "ctrl+s" {
-			return g, g.submit()
-		}
-		f, cmd := g.form.Update(m)
-		if x, ok := f.(*huh.Form); ok {
-			g.form = x
-		}
-		if g.form.State == huh.StateCompleted {
-			return g, g.submit()
-		}
-		return g, cmd
+		return g, updateForm(&g.form, m, func() { g.mode = goalList }, g.submit)
 	}
 	switch m.String() {
 	case "enter":
@@ -222,7 +196,7 @@ func (g *Goals) refilter() {
 			x.Title,
 		})
 	}
-	g.tbl.SetRows(components.Stripe(rows, goalCols(g.width-6)))
+	g.tbl.SetRows(rows)
 }
 
 func (g *Goals) startNew() tea.Cmd {
@@ -254,12 +228,7 @@ func (g *Goals) startEdit() tea.Cmd {
 func (g *Goals) newForm() *huh.Form {
 	d := &g.formIn
 	return huh.NewForm(huh.NewGroup(
-		huh.NewInput().Title("Title").Value(&d.title).Validate(func(s string) error {
-			if strings.TrimSpace(s) == "" {
-				return fmt.Errorf("required")
-			}
-			return nil
-		}),
+		huh.NewInput().Title("Title").Value(&d.title).Validate(notEmpty),
 		huh.NewText().Title("Description").Value(&d.description).Lines(3),
 		huh.NewInput().Title("Category").Value(&d.category),
 		huh.NewSelect[string]().Title("Status").Options(
@@ -268,7 +237,7 @@ func (g *Goals) newForm() *huh.Form {
 			huh.NewOption("Abandoned", "abandoned"),
 		).Value(&d.status),
 		huh.NewInput().Title("Deadline (YYYY-MM-DD)").Value(&d.deadline).Validate(validateOptionalDate),
-		huh.NewInput().Title("Progress (0-100)").Value(&d.progress),
+		huh.NewInput().Title("Progress (0-100)").Value(&d.progress).Validate(validateOptionalInt),
 	)).WithKeyMap(components.FormKeyMap())
 }
 
@@ -324,7 +293,7 @@ func (g *Goals) View() string {
 		return styles.MutedText.Render("Loading goals...")
 	}
 	header := renderPills(g.filter, []string{"all", "active", "completed", "abandoned"})
-	g.tbl.SetColumns(components.WithStripeColumn(goalCols(g.width - 6)))
+	g.tbl.SetColumns(goalCols(g.width - 6))
 	if g.height-8 > 0 {
 		g.tbl.SetHeight(g.height - 8)
 	}
@@ -391,7 +360,7 @@ func (g *Goals) Help() []components.HelpEntry {
 }
 func (g *Goals) SetSize(w, h int) {
 	g.width, g.height = w, h
-	g.tbl.SetColumns(components.WithStripeColumn(goalCols(w - 6)))
+	g.tbl.SetColumns(goalCols(w - 6))
 	if h-8 > 0 {
 		g.tbl.SetHeight(h - 8)
 	}

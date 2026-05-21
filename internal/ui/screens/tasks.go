@@ -111,14 +111,7 @@ func (t *Tasks) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return t.handleKey(m)
 	}
 	if t.mode == taskForm && t.form != nil {
-		f, cmd := t.form.Update(msg)
-		if ff, ok := f.(*huh.Form); ok {
-			t.form = ff
-		}
-		if t.form.State == huh.StateCompleted {
-			return t, t.submitForm()
-		}
-		return t, cmd
+		return t, updateForm(&t.form, msg, func() { t.mode = taskList }, t.submitForm)
 	}
 	if t.mode == taskList {
 		var cmd tea.Cmd
@@ -131,16 +124,13 @@ func (t *Tasks) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (t *Tasks) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch t.mode {
 	case taskConfirmDelete:
-		if m.String() == "y" {
+		return t, handleConfirmDelete(m.String(), func() tea.Cmd {
 			t.mode = taskList
-			return t, t.deleteSelected()
-		}
-		if m.String() == "n" || m.String() == "esc" {
+			return t.deleteSelected()
+		}, func() {
 			t.mode = taskList
 			t.pendingDeleteID = ""
-			return t, nil
-		}
-		return t, nil
+		})
 	case taskDetail:
 		switch m.String() {
 		case "esc":
@@ -155,22 +145,7 @@ func (t *Tasks) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return t, nil
 	case taskForm:
-		if m.String() == "esc" {
-			t.mode = taskList
-			t.form = nil
-			return t, nil
-		}
-		if m.String() == "ctrl+s" {
-			return t, t.submitForm()
-		}
-		f, cmd := t.form.Update(m)
-		if ff, ok := f.(*huh.Form); ok {
-			t.form = ff
-		}
-		if t.form.State == huh.StateCompleted {
-			return t, t.submitForm()
-		}
-		return t, cmd
+		return t, updateForm(&t.form, m, func() { t.mode = taskList }, t.submitForm)
 	case taskCalendar:
 		if m.String() == "esc" {
 			t.mode = taskList
@@ -274,7 +249,7 @@ func (t *Tasks) refilter() {
 			truncate(strings.Join(x.Tags, ","), 14),
 		})
 	}
-	t.tbl.SetRows(components.Stripe(rows, taskCols(t.width-6)))
+	t.tbl.SetRows(rows)
 }
 
 func smartLess(a, b api.Task) bool {
@@ -342,12 +317,7 @@ func (t *Tasks) newForm(title string) *huh.Form {
 	d := &t.formData
 	return huh.NewForm(
 		huh.NewGroup(
-			huh.NewInput().Title("Title").Value(&d.title).Validate(func(s string) error {
-				if strings.TrimSpace(s) == "" {
-					return fmt.Errorf("required")
-				}
-				return nil
-			}),
+			huh.NewInput().Title("Title").Value(&d.title).Validate(notEmpty),
 			huh.NewText().Title("Description").Value(&d.description).Lines(4),
 			huh.NewSelect[string]().Title("Status").Options(
 				huh.NewOption("To Do", "todo"),
@@ -362,20 +332,9 @@ func (t *Tasks) newForm(title string) *huh.Form {
 			huh.NewInput().Title("Due date (YYYY-MM-DD)").Value(&d.dueDate).Validate(validateOptionalDate),
 			huh.NewInput().Title("Tags (comma separated)").Value(&d.tags),
 			huh.NewInput().Title("Scheduled start (RFC3339, optional)").Value(&d.scheduled),
-			huh.NewInput().Title("Duration minutes (optional)").Value(&d.duration),
+			huh.NewInput().Title("Duration minutes (optional)").Value(&d.duration).Validate(validateOptionalInt),
 		),
 	).WithTheme(huh.ThemeBase()).WithKeyMap(components.FormKeyMap())
-}
-
-func validateOptionalDate(s string) error {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return nil
-	}
-	if _, err := time.Parse("2006-01-02", s); err != nil {
-		return fmt.Errorf("expected YYYY-MM-DD")
-	}
-	return nil
 }
 
 func (t *Tasks) submitForm() tea.Cmd {
@@ -423,16 +382,6 @@ func splitTags(s string) []string {
 	return out
 }
 
-func parseInt(s string) (int, error) {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return 0, fmt.Errorf("empty")
-	}
-	var n int
-	_, err := fmt.Sscanf(s, "%d", &n)
-	return n, err
-}
-
 func (t *Tasks) deleteSelected() tea.Cmd {
 	id := t.pendingDeleteID
 	t.pendingDeleteID = ""
@@ -477,7 +426,7 @@ func (t *Tasks) View() string {
 		tableHeight = 5
 	}
 	t.tbl.SetHeight(tableHeight)
-	t.tbl.SetColumns(components.WithStripeColumn(taskCols(t.width - 6)))
+	t.tbl.SetColumns(taskCols(t.width - 6))
 	hints := []string{
 		styles.KeyHint("↵", "details"),
 		styles.KeyHint("n", "new"),
@@ -585,7 +534,7 @@ func (t *Tasks) Help() []components.HelpEntry {
 }
 func (t *Tasks) SetSize(w, h int) {
 	t.width, t.height = w, h
-	t.tbl.SetColumns(components.WithStripeColumn(taskCols(w - 6)))
+	t.tbl.SetColumns(taskCols(w - 6))
 	if h-8 > 0 {
 		t.tbl.SetHeight(h - 8)
 	}

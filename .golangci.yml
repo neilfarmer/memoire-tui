@@ -1,0 +1,19 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: none
+  enable:
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - bodyclose
+    - misspell
+    - unconvert
+  # errcheck deliberately omitted: it flags conventional defer-Close
+  # idioms across nearly every file. govet + staticcheck already catch
+  # the unchecked-error patterns that matter.
